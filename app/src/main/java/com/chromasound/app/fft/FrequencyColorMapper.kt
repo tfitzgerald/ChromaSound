@@ -1,81 +1,68 @@
 package com.chromasound.app.fft
 
 import androidx.compose.ui.graphics.Color
-import kotlin.math.*
+import kotlin.math.pow
 
 /**
- * Maps FFT frequency bins → RGBA colors using a perceptual spectral mapping.
+ * Maps a frequency in Hz to a fully-opaque hue-saturated color.
  *
- * Frequency → Hue mapping (mirrors visible light spectrum, inverted for aesthetics):
- *   Sub-bass   (20–60 Hz)    → Deep violet / indigo
- *   Bass       (60–250 Hz)   → Blue
- *   Low-mid    (250–500 Hz)  → Cyan / teal
- *   Mid        (500–2k Hz)   → Green → yellow
- *   High-mid   (2k–6k Hz)    → Orange → red
- *   Presence   (6k–12k Hz)   → Red → magenta
- *   Air/Treble (12k–22k Hz)  → Magenta → violet
+ * The mapping mirrors the visible light spectrum (inverted so low frequencies
+ * feel warm-dark and high frequencies feel cool-bright):
  *
- * Magnitude (0..1) → Saturation and brightness.
- * Volume (RMS 0..1) → Overall blob radius / alpha scaling (handled by caller).
+ *   Sub-bass   20 – 60 Hz    →  Deep violet   (hue ~270°)
+ *   Bass       60 – 250 Hz   →  Blue          (hue ~230°)
+ *   Low-mid   250 – 500 Hz   →  Cyan          (hue ~190°)
+ *   Mid       500 – 2k  Hz   →  Green→Yellow  (hue ~120°–60°)
+ *   High-mid    2k – 6k  Hz  →  Orange→Red    (hue ~30°–0°)
+ *   Presence    6k – 12k Hz  →  Red→Magenta   (hue ~350°–310°)
+ *   Air        12k – 22k Hz  →  Magenta→Violet(hue ~300°–270°)
  */
 object FrequencyColorMapper {
 
+    private const val MIN_HZ =   20f
+    private const val MAX_HZ = 22000f
+
     /**
-     * Convert a normalized frequency position [0, 1] to a hue angle [0°, 360°].
-     * Uses a slightly curved mapping so mid-frequencies get more color range.
+     * Convert a frequency in Hz to a Compose [Color].
+     * Alpha is always 1f (fully opaque) — fading is handled by the canvas
+     * using the circle's remaining lifetime fraction.
      */
-    fun frequencyToHue(normalizedFreq: Float): Float {
-        // Curve toward bass end — bass dominates sound so give it a wider arc
-        val curved = normalizedFreq.pow(0.6f)
-        // Map 0→1 to hue 260°→0° (violet → red, matching visible spectrum feel)
-        return (1f - curved) * 260f
+    fun frequencyToColor(hz: Float): Color {
+        // Logarithmic position in the audible spectrum [0, 1]
+        val logMin = Math.log10(MIN_HZ.toDouble())
+        val logMax = Math.log10(MAX_HZ.toDouble())
+        val logHz  = Math.log10(hz.toDouble().coerceIn(MIN_HZ.toDouble(), MAX_HZ.toDouble()))
+        val t = ((logHz - logMin) / (logMax - logMin)).toFloat().coerceIn(0f, 1f)
+
+        // Map t [0=bass, 1=treble] → hue [270°=violet, 0°=red, wrapping through magenta]
+        // We traverse: violet(270) → blue(230) → cyan(190) → green(120) → yellow(60) → red(0)
+        // then for the top octave continue: red→magenta→violet
+        val hue = when {
+            t < 0.75f -> 270f - (t / 0.75f) * 270f   // violet → red over 75% of range
+            else      -> (t - 0.75f) / 0.25f * (-30f) // red wraps back toward magenta
+        }.let { h -> ((h % 360f) + 360f) % 360f }     // normalise to [0, 360)
+
+        return hsvToColor(hue, saturation = 1f, value = 1f)
     }
 
     /**
-     * Convert a single FFT bin into a Compose [Color].
-     *
-     * @param normalizedFreq   Bin position normalized to [0, 1]
-     * @param magnitude        FFT magnitude normalized to [0, 1]
-     * @param globalVolume     Overall RMS level [0, 1] for alpha modulation
+     * Convert HSV to Compose [Color] (alpha always 1f).
      */
-    fun binToColor(
-        normalizedFreq: Float,
-        magnitude: Float,
-        globalVolume: Float
-    ): Color {
-        val hue = frequencyToHue(normalizedFreq)
-
-        // Saturation: full at mid magnitudes, slightly desaturated at extremes
-        val saturation = (0.5f + magnitude * 0.5f).coerceIn(0f, 1f)
-
-        // Value/brightness: scales with magnitude — quiet = dark, loud = bright
-        val value = (0.2f + magnitude * 0.8f).coerceIn(0f, 1f)
-
-        // Alpha: magnitude * global volume — silent bins fade away completely
-        val alpha = (magnitude * (0.3f + globalVolume * 0.7f)).coerceIn(0f, 1f)
-
-        return hsvToColor(hue, saturation, value, alpha)
-    }
-
-    /** Convert HSV + alpha to Compose Color. */
-    private fun hsvToColor(hue: Float, saturation: Float, value: Float, alpha: Float): Color {
+    fun hsvToColor(hue: Float, saturation: Float, value: Float): Color {
         val h = hue / 60f
         val i = h.toInt()
         val f = h - i
         val p = value * (1f - saturation)
         val q = value * (1f - saturation * f)
         val t = value * (1f - saturation * (1f - f))
-
         val (r, g, b) = when (i % 6) {
-            0 -> Triple(value, t, p)
-            1 -> Triple(q, value, p)
-            2 -> Triple(p, value, t)
-            3 -> Triple(p, q, value)
-            4 -> Triple(t, p, value)
+            0    -> Triple(value, t, p)
+            1    -> Triple(q, value, p)
+            2    -> Triple(p, value, t)
+            3    -> Triple(p, q, value)
+            4    -> Triple(t, p, value)
             else -> Triple(value, p, q)
         }
-        return Color(r, g, b, alpha)
+        return Color(r, g, b, 1f)
     }
 }
-
-private fun Float.pow(exp: Float): Float = this.toDouble().pow(exp.toDouble()).toFloat()

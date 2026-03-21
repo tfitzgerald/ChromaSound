@@ -3,42 +3,55 @@ package com.chromasound.app.model
 import androidx.compose.ui.graphics.Color
 
 /**
- * Represents a single rendered color blotch on the ChromaSound canvas.
+ * A single frequency circle displayed on the ChromaSound canvas.
  *
- * Blotches are spawned from dominant FFT frequency bins and decay over time.
+ * Rules:
+ *  - Color    → derived from the frequency (Hz) of the FFT bin
+ *  - Radius   → derived from the decibel level of that bin
+ *  - Lifetime → exactly 1.5 seconds, then removed
  *
- * @param x            Normalized horizontal position [0, 1]
- * @param y            Normalized vertical position [0, 1]
- * @param radius       Normalized radius [0, 1] relative to screen width
- * @param color        RGBA color derived from frequency and magnitude
- * @param life         Current life [0, 1] — 1 = freshly spawned, 0 = dead
- * @param decayRate    How fast life drains per frame [0, 1]
- * @param frequencyBin Source FFT bin index (used for position seeding)
+ * @param x              Normalised horizontal position [0, 1]
+ * @param y              Normalised vertical position [0, 1]
+ * @param radiusPx       Radius in pixels (computed from dB level)
+ * @param color          Fully-opaque hue mapped from frequency
+ * @param spawnTimeMs    System.currentTimeMillis() when this circle was born
+ * @param frequencyHz    The actual frequency in Hz (for HUD display)
+ * @param decibelLevel   The dB level that set this circle's radius (for HUD display)
  */
-data class ColorBlotch(
+data class FrequencyCircle(
     val x: Float,
     val y: Float,
-    val radius: Float,
+    val radiusPx: Float,
     val color: Color,
-    val life: Float = 1f,
-    val decayRate: Float = 0.015f,
-    val frequencyBin: Int = 0
+    val spawnTimeMs: Long,
+    val frequencyHz: Float,
+    val decibelLevel: Float
 ) {
-    val isAlive: Boolean get() = life > 0.01f
+    companion object {
+        const val LIFETIME_MS = 1500L   // 1.5 seconds exactly
+    }
 
-    fun decayed(): ColorBlotch = copy(life = (life - decayRate).coerceAtLeast(0f))
+    /** Fraction of life remaining: 1.0 = just spawned, 0.0 = expired */
+    fun lifefraction(nowMs: Long): Float {
+        val age = (nowMs - spawnTimeMs).coerceAtLeast(0L)
+        return (1f - age.toFloat() / LIFETIME_MS).coerceIn(0f, 1f)
+    }
+
+    fun isAlive(nowMs: Long): Boolean = (nowMs - spawnTimeMs) < LIFETIME_MS
 }
 
 /**
- * Snapshot of one analysis frame passed from the audio engine to the UI.
+ * One analysed audio frame from the FFT pipeline.
  *
- * @param magnitudes    Normalized FFT magnitudes (size = FFT_SIZE / 2)
- * @param rmsVolume     Root-mean-square volume [0, 1]
- * @param dominantBins  Indices of the top N loudest frequency bins
+ * @param magnitudes    Normalised FFT magnitudes, length = FFT_SIZE / 2
+ * @param rmsVolume     Root-mean-square amplitude [0, 1]
+ * @param decibelLevels Per-bin dB value (negative, e.g. -60 dB = silence, 0 dB = full scale)
+ * @param dominantBins  Indices of the loudest bins above the silence threshold
  */
 data class AudioFrame(
     val magnitudes: FloatArray = FloatArray(0),
     val rmsVolume: Float = 0f,
+    val decibelLevels: FloatArray = FloatArray(0),
     val dominantBins: List<Int> = emptyList()
 ) {
     override fun equals(other: Any?): Boolean {
@@ -46,6 +59,5 @@ data class AudioFrame(
         if (other !is AudioFrame) return false
         return rmsVolume == other.rmsVolume && dominantBins == other.dominantBins
     }
-
     override fun hashCode(): Int = 31 * rmsVolume.hashCode() + dominantBins.hashCode()
 }
