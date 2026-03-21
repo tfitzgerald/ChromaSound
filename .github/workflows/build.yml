@@ -1,0 +1,116 @@
+name: Build ChromaSound APK
+
+# ── Triggers ──────────────────────────────────────────────────────────────────
+# No local tools needed — GitHub's cloud does 100% of the build work.
+on:
+  push:
+    branches: [ "main", "develop" ]   # Debug APK on every push
+  pull_request:
+    branches: [ "main" ]              # Build check on PRs
+  workflow_dispatch:                  # Manual trigger from GitHub Actions UI
+  release:
+    types: [ created ]                # Signed release APK when you publish a release
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    # ── Use the official Gradle+JDK17 Docker image ──────────────────────────
+    # This contains Java 17 and Gradle 8.6 pre-installed.
+    # No wrapper jar, no local Gradle, no Android Studio needed.
+    container:
+      image: gradle:8.6-jdk17
+
+    steps:
+
+      # ── 1. Check out your source code ─────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Install Android SDK tools inside the container ─────────────────
+      - name: Install Android command-line tools
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq wget unzip
+          mkdir -p /opt/android-sdk/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip \
+               -O /tmp/cmdtools.zip
+          unzip -q /tmp/cmdtools.zip -d /opt/android-sdk/cmdline-tools
+          mv /opt/android-sdk/cmdline-tools/cmdline-tools \
+             /opt/android-sdk/cmdline-tools/latest
+          echo "ANDROID_HOME=/opt/android-sdk"      >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=/opt/android-sdk"  >> $GITHUB_ENV
+          echo "/opt/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "/opt/android-sdk/platform-tools"           >> $GITHUB_PATH
+
+      # ── 3. Accept SDK licenses and install required packages ───────────────
+      - name: Install SDK packages (API 34 + build-tools)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager \
+            "platforms;android-34" \
+            "build-tools;34.0.0"   \
+            "platform-tools"
+
+      # ── 4. Cache Gradle downloads (makes repeat builds 2–3 min faster) ─────
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            /root/.gradle/caches
+            /root/.gradle/wrapper
+          key: gradle-${{ hashFiles('**/*.gradle*', '**/libs.versions.toml') }}
+          restore-keys: gradle-
+
+      # ── 5. Build DEBUG APK ─────────────────────────────────────────────────
+      # Calls gradle directly — no ./gradlew wrapper needed
+      - name: Build Debug APK
+        run: gradle assembleDebug --no-daemon --stacktrace
+        env:
+          ANDROID_HOME: /opt/android-sdk
+          ANDROID_SDK_ROOT: /opt/android-sdk
+
+      # ── 6. Upload debug APK — downloadable from the Actions tab ───────────
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChromaSound-debug-${{ github.sha }}
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      # ── 7. Build SIGNED RELEASE APK (release events + manual trigger) ──────
+      # Requires 4 GitHub Secrets — see README for setup instructions
+      - name: Decode keystore from secret
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/chromasound.keystore
+
+      - name: Build Release APK (signed)
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+        run: |
+          gradle assembleRelease --no-daemon --stacktrace \
+            -Pandroid.injected.signing.store.file=${{ github.workspace }}/app/chromasound.keystore \
+            -Pandroid.injected.signing.store.password=${{ secrets.KEY_STORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+        env:
+          ANDROID_HOME: /opt/android-sdk
+          ANDROID_SDK_ROOT: /opt/android-sdk
+
+      - name: Upload Release APK artifact
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChromaSound-release-${{ github.sha }}
+          path: app/build/outputs/apk/release/app-release.apk
+          retention-days: 90
+
+      # ── 8. Attach signed APK to the GitHub Release page ───────────────────
+      - name: Attach APK to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/release/app-release.apk
+          token: ${{ secrets.GITHUB_TOKEN }}
