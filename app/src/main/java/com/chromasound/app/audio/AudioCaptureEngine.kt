@@ -5,6 +5,7 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import com.chromasound.app.fft.FFTEngine
 import com.chromasound.app.model.AudioFrame
+import com.chromasound.app.model.FrequencyBands
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -16,25 +17,24 @@ import kotlin.math.max
 import kotlin.math.sqrt
 
 /**
- * Captures microphone audio and emits analysed [AudioFrame]s via a Kotlin Flow.
+ * Captures raw microphone audio and emits [AudioFrame]s via a Kotlin Flow.
  *
- * Pipeline per frame:
- *   PCM float samples → Hann window → Cooley-Tukey FFT → magnitudes + dB levels
+ * Per frame:
+ *   PCM float (44100 Hz, 4096 samples) → Hann window → FFT
+ *   → per-bin dBFS → per-band peak bin selection
  *
- * Frame rate: SAMPLE_RATE / FFT_SIZE = 44100 / 4096 ≈ 10.77 frames/second
- * At that rate, 1.5 s = ~16 frames.
+ * Frequency coverage: 30 Hz – 12 000 Hz split into 16 logarithmic bands.
+ * Each band reports the single bin with the highest dB above the spawn
+ * threshold, or -1 if the band is silent.
  */
 class AudioCaptureEngine {
 
     companion object {
-        const val SAMPLE_RATE       = 44100   // Hz
-        const val FFT_SIZE          = 4096    // Power of 2; controls freq resolution & frame rate
-        const val SILENCE_THRESHOLD = 0.003f  // RMS below this → emit no dominant bins
-
-        // dB floor: bins quieter than this are ignored (avoids spawning circles for noise)
-        const val DB_FLOOR = -60f             // dBFS
-        // Only bins above this threshold spawn circles
-        const val DB_SPAWN_THRESHOLD = -45f   // dBFS
+        const val SAMPLE_RATE        = 44100    // Hz
+        const val FFT_SIZE           = 4096     // Must be power of 2
+        const val DB_FLOOR           = -80f     // dBFS floor (treat as silence)
+        const val DB_SPAWN_THRESHOLD = -50f     // dBFS — bands below this spawn nothing
+        const val SILENCE_THRESHOLD  = 0.002f   // RMS below this → all bands silent
     }
 
     private val hannWindow = FFTEngine.hannWindow(FFT_SIZE)
@@ -62,19 +62,28 @@ class AudioCaptureEngine {
         val pcm      = FloatArray(FFT_SIZE)
         val windowed = FloatArray(FFT_SIZE)
 
+        // Pre-compute which FFT bin belongs to which band.
+        // bin → Hz:  hz = bin * SAMPLE_RATE / FFT_SIZE
+        val binBand = IntArray(FFT_SIZE / 2) { bin ->
+            val hz = bin.toFloat() * SAMPLE_RATE / FFT_SIZE.toFloat()
+            FrequencyBands.bandFor(hz)   // -1 for out-of-range bins
+        }
+
         try {
             recorder.startRecording()
 
             while (coroutineContext.isActive) {
-                // Collect exactly FFT_SIZE samples (blocking)
+                // Read exactly FFT_SIZE samples
                 var totalRead = 0
                 while (totalRead < FFT_SIZE && coroutineContext.isActive) {
-                    val n = recorder.read(pcm, totalRead, FFT_SIZE - totalRead, AudioRecord.READ_BLOCKING)
+                    val n = recorder.read(
+                        pcm, totalRead, FFT_SIZE - totalRead, AudioRecord.READ_BLOCKING
+                    )
                     if (n > 0) totalRead += n else break
                 }
                 if (totalRead < FFT_SIZE) continue
 
-                // RMS amplitude
+                // RMS
                 var sumSq = 0.0
                 for (s in pcm) sumSq += s * s
                 val rms = sqrt(sumSq / FFT_SIZE).toFloat().coerceIn(0f, 1f)
@@ -82,30 +91,36 @@ class AudioCaptureEngine {
                 // Hann window
                 for (i in 0 until FFT_SIZE) windowed[i] = pcm[i] * hannWindow[i]
 
-                // FFT → normalised magnitudes [0, 1]
+                // FFT → normalised magnitudes
                 val magnitudes = FFTEngine.computeMagnitudes(windowed)
 
-                // Convert each bin's magnitude to dBFS
-                // dBFS = 20 * log10(magnitude); magnitude 0 → clamp to DB_FLOOR
+                // dBFS per bin
                 val decibelLevels = FloatArray(magnitudes.size) { i ->
                     val mag = magnitudes[i]
                     if (mag < 1e-10f) DB_FLOOR
                     else max(20f * log10(mag.toDouble()).toFloat(), DB_FLOOR)
                 }
 
-                // Dominant bins: all bins above DB_SPAWN_THRESHOLD (not just top N)
-                // Skip bin 0 (DC component) and bin 1 (very low rumble)
-                val dominantBins = if (rms > SILENCE_THRESHOLD) {
-                    decibelLevels.mapIndexed { idx, db -> idx to db }
-                        .drop(2)                               // skip DC + near-DC
-                        .filter { (_, db) -> db > DB_SPAWN_THRESHOLD }
-                        .sortedByDescending { (_, db) -> db }
-                        .map { (idx, _) -> idx }
-                } else {
-                    emptyList()
+                // For each of the 16 bands: find the loudest bin above threshold
+                // bandPeakBins[b] = bin index of loudest bin in band b, or -1 if silent
+                val bandPeakBins = IntArray(FrequencyBands.COUNT) { -1 }
+
+                if (rms > SILENCE_THRESHOLD) {
+                    val bandPeakDb = FloatArray(FrequencyBands.COUNT) { DB_SPAWN_THRESHOLD }
+
+                    for (bin in 1 until magnitudes.size) {   // skip DC bin 0
+                        val band = binBand[bin]
+                        if (band < 0) continue               // outside 30–12000 Hz
+
+                        val db = decibelLevels[bin]
+                        if (db > bandPeakDb[band]) {
+                            bandPeakDb[band]   = db
+                            bandPeakBins[band] = bin
+                        }
+                    }
                 }
 
-                emit(AudioFrame(magnitudes, rms, decibelLevels, dominantBins))
+                emit(AudioFrame(magnitudes, rms, decibelLevels, bandPeakBins))
             }
         } finally {
             recorder.stop()
