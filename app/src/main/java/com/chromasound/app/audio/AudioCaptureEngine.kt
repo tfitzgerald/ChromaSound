@@ -17,11 +17,12 @@ import kotlin.math.max
 import kotlin.math.sqrt
 
 /**
- * Captures microphone audio and emits [AudioFrame]s.
+ * Captures raw microphone audio and emits [AudioFrame]s.
  *
- * The [bands] parameter is read each frame, so changing the [BandDefinition]
- * (e.g. from the settings slider) takes effect immediately without restarting
- * the audio capture loop.
+ * @param bands       Lambda returning the current [BandDefinition] — read each frame.
+ * @param sensitivity Lambda returning the current sensitivity multiplier (0.1 – 3.0).
+ *                    Applied as a gain to raw dB levels before threshold comparison:
+ *                    values > 1 make quiet sounds trigger circles, < 1 requires louder input.
  */
 class AudioCaptureEngine {
 
@@ -29,17 +30,16 @@ class AudioCaptureEngine {
         const val SAMPLE_RATE        = 44100
         const val FFT_SIZE           = 4096
         const val DB_FLOOR           = -80f
-        const val DB_SPAWN_THRESHOLD = -50f
+        const val DB_SPAWN_THRESHOLD = -50f   // base threshold before sensitivity scaling
         const val SILENCE_THRESHOLD  = 0.002f
     }
 
     private val hannWindow = FFTEngine.hannWindow(FFT_SIZE)
 
-    /**
-     * @param bands  A lambda that returns the *current* [BandDefinition].
-     *               Called once per FFT frame so slider changes apply live.
-     */
-    fun audioFrameFlow(bands: () -> BandDefinition): Flow<AudioFrame> = flow {
+    fun audioFrameFlow(
+        bands:       () -> BandDefinition,
+        sensitivity: () -> Float
+    ): Flow<AudioFrame> = flow {
 
         val minBuf     = AudioRecord.getMinBufferSize(
             SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_FLOAT
@@ -64,17 +64,14 @@ class AudioCaptureEngine {
             recorder.startRecording()
 
             while (coroutineContext.isActive) {
-                // Read exactly FFT_SIZE samples
                 var totalRead = 0
                 while (totalRead < FFT_SIZE && coroutineContext.isActive) {
-                    val n = recorder.read(
-                        pcm, totalRead, FFT_SIZE - totalRead, AudioRecord.READ_BLOCKING
-                    )
+                    val n = recorder.read(pcm, totalRead, FFT_SIZE - totalRead, AudioRecord.READ_BLOCKING)
                     if (n > 0) totalRead += n else break
                 }
                 if (totalRead < FFT_SIZE) continue
 
-                // RMS
+                // RMS amplitude
                 var sumSq = 0.0
                 for (s in pcm) sumSq += s * s
                 val rms = sqrt(sumSq / FFT_SIZE).toFloat().coerceIn(0f, 1f)
@@ -83,17 +80,24 @@ class AudioCaptureEngine {
                 for (i in 0 until FFT_SIZE) windowed[i] = pcm[i] * hannWindow[i]
                 val magnitudes = FFTEngine.computeMagnitudes(windowed)
 
-                // dBFS per bin
-                val dBLevels = FloatArray(magnitudes.size) { i ->
+                // dBFS per bin — raw values before sensitivity
+                val rawDb = FloatArray(magnitudes.size) { i ->
                     val mag = magnitudes[i]
                     if (mag < 1e-10f) DB_FLOOR
                     else max(20f * log10(mag.toDouble()).toFloat(), DB_FLOOR)
                 }
 
-                // Fetch the current band definition (may have changed since last frame)
-                val bd = bands()
+                // Apply sensitivity: multiply dB values so they "shift" toward the threshold.
+                // sensitivity = 1.0 → no change
+                // sensitivity = 2.0 → a -60 dB signal is treated as -30 dB (easier to trigger)
+                // sensitivity = 0.5 → a -30 dB signal is treated as -60 dB (harder to trigger)
+                val gain = sensitivity().coerceIn(0.1f, 3.0f)
+                val dBLevels = FloatArray(rawDb.size) { i ->
+                    (rawDb[i] * gain).coerceIn(DB_FLOOR, 0f)
+                }
 
-                // For each band: loudest bin above threshold, or -1 if silent
+                // Per-band: loudest boosted bin above threshold, or -1 if silent
+                val bd = bands()
                 val bandPeakBins = IntArray(bd.count) { -1 }
 
                 if (rms > SILENCE_THRESHOLD) {

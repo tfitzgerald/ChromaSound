@@ -2,40 +2,53 @@ package com.chromasound.app.model
 
 import androidx.compose.ui.graphics.Color
 
+// ── Color scheme enum ─────────────────────────────────────────────────────────
+
+enum class ColorScheme {
+    /** Bass = violet → treble = red  (matches visible light spectrum) */
+    RAINBOW,
+    /** Bass = red → treble = violet  (inverted spectrum) */
+    INVERSE_RAINBOW
+}
+
 // ── User-adjustable settings ──────────────────────────────────────────────────
 
-/**
- * All user-adjustable visualisation parameters in one place.
- * Held in a single StateFlow so the settings screen and ViewModel stay in sync.
- */
 data class Settings(
-    val bandCount:      Int   = BandDefinition.DEFAULT_BANDS,
-    val lifetimeMs:     Long  = 500L,   // 100 ms – 2000 ms
-    val circlesPerBand: Int   = 1,      // 1 – 5
-    val minRadiusPx:    Float = 10f,    // 5 – 120 px
-    val maxRadiusPx:    Float = 160f    // 20 – 250 px
+    val bandCount:      Int         = BandDefinition.DEFAULT_BANDS,
+    val lifetimeMs:     Long        = 500L,
+    val circlesPerBand: Int         = 1,
+    val minRadiusPx:    Float       = 10f,
+    val maxRadiusPx:    Float       = 160f,
+    // 0.0 = every circle locked to band centre column
+    // 1.0 = circles scatter freely across the full screen width
+    val placement:      Float       = 0.3f,
+    // Multiplier applied to raw dB values before threshold comparison.
+    // < 1.0 = less sensitive (only loud sounds trigger circles)
+    // > 1.0 = more sensitive (quiet sounds also trigger circles)
+    val sensitivity:    Float       = 1.0f,
+    val colorScheme:    ColorScheme = ColorScheme.RAINBOW
 ) {
     companion object {
-        const val MIN_LIFETIME_MS     = 100L
-        const val MAX_LIFETIME_MS     = 2000L
+        const val MIN_LIFETIME_MS      = 100L
+        const val MAX_LIFETIME_MS      = 2000L
         const val MIN_CIRCLES_PER_BAND = 1
         const val MAX_CIRCLES_PER_BAND = 5
-        const val MIN_RADIUS_FLOOR    = 5f
-        const val MAX_RADIUS_FLOOR    = 120f
-        const val MIN_RADIUS_CEILING  = 20f
-        const val MAX_RADIUS_CEILING  = 250f
+        const val MIN_RADIUS_FLOOR     = 5f
+        const val MAX_RADIUS_FLOOR     = 120f
+        const val MIN_RADIUS_CEILING   = 20f
+        const val MAX_RADIUS_CEILING   = 250f
+        const val MIN_PLACEMENT        = 0f
+        const val MAX_PLACEMENT        = 1f
+        const val MIN_SENSITIVITY      = 0.1f
+        const val MAX_SENSITIVITY      = 3.0f
     }
 }
 
 // ── Circle model ──────────────────────────────────────────────────────────────
 
-/**
- * One frequency-band circle on the ChromaSound canvas.
- * Lifetime is supplied at spawn time from [Settings.lifetimeMs].
- */
 data class FrequencyCircle(
     val bandIndex:    Int,
-    val slotIndex:    Int,      // which circle slot within the band (0-based)
+    val slotIndex:    Int,
     val x:            Float,
     val y:            Float,
     val radiusPx:     Float,
@@ -49,7 +62,6 @@ data class FrequencyCircle(
         val age = (nowMs - spawnTimeMs).coerceAtLeast(0L)
         return (1f - age.toFloat() / lifetimeMs).coerceIn(0f, 1f)
     }
-
     fun isAlive(nowMs: Long): Boolean = (nowMs - spawnTimeMs) < lifetimeMs
 }
 
@@ -78,10 +90,10 @@ data class BandDefinition(
     val centreHz: FloatArray
 ) {
     companion object {
-        const val MIN_HZ       = 30f
-        const val MAX_HZ       = 11_000f
-        const val MIN_BANDS    = 2
-        const val MAX_BANDS    = 24
+        const val MIN_HZ        = 30f
+        const val MAX_HZ        = 11_000f
+        const val MIN_BANDS     = 2
+        const val MAX_BANDS     = 24
         const val DEFAULT_BANDS = 16
 
         fun build(count: Int): BandDefinition {

@@ -1,53 +1,46 @@
 package com.chromasound.app.fft
 
 import androidx.compose.ui.graphics.Color
-import kotlin.math.pow
+import com.chromasound.app.model.ColorScheme
 
 /**
- * Maps a frequency in Hz to a fully-opaque hue-saturated color.
+ * Maps a frequency in Hz to a fully-opaque colour.
  *
- * The mapping mirrors the visible light spectrum (inverted so low frequencies
- * feel warm-dark and high frequencies feel cool-bright):
+ * RAINBOW        Bass (30 Hz) = violet  →  Treble (11 kHz) = red
+ * INVERSE_RAINBOW Bass (30 Hz) = red    →  Treble (11 kHz) = violet
  *
- *   Sub-bass   20 – 60 Hz    →  Deep violet   (hue ~270°)
- *   Bass       60 – 250 Hz   →  Blue          (hue ~230°)
- *   Low-mid   250 – 500 Hz   →  Cyan          (hue ~190°)
- *   Mid       500 – 2k  Hz   →  Green→Yellow  (hue ~120°–60°)
- *   High-mid    2k – 6k  Hz  →  Orange→Red    (hue ~30°–0°)
- *   Presence    6k – 12k Hz  →  Red→Magenta   (hue ~350°–310°)
- *   Air        12k – 22k Hz  →  Magenta→Violet(hue ~300°–270°)
+ * Both schemes traverse the full visible-light hue wheel so every band
+ * always gets a distinct, saturated colour.
  */
 object FrequencyColorMapper {
 
-    private const val MIN_HZ =   20f
-    private const val MAX_HZ = 22000f
+    // Use the app's actual frequency range so colours fill the whole wheel
+    private const val MIN_HZ =   30f
+    private const val MAX_HZ = 11_000f
 
     /**
-     * Convert a frequency in Hz to a Compose [Color].
-     * Alpha is always 1f (fully opaque) — fading is handled by the canvas
-     * using the circle's remaining lifetime fraction.
+     * Convert [hz] to a Compose [Color] using the given [scheme].
+     * Alpha is always 1f — fading is done by the canvas draw loop.
      */
-    fun frequencyToColor(hz: Float): Color {
-        // Logarithmic position in the audible spectrum [0, 1]
+    fun frequencyToColor(hz: Float, scheme: ColorScheme = ColorScheme.RAINBOW): Color {
+        // Logarithmic position in the frequency range [0 = bass, 1 = treble]
         val logMin = Math.log10(MIN_HZ.toDouble())
         val logMax = Math.log10(MAX_HZ.toDouble())
         val logHz  = Math.log10(hz.toDouble().coerceIn(MIN_HZ.toDouble(), MAX_HZ.toDouble()))
         val t = ((logHz - logMin) / (logMax - logMin)).toFloat().coerceIn(0f, 1f)
 
-        // Map t [0=bass, 1=treble] → hue [270°=violet, 0°=red, wrapping through magenta]
-        // We traverse: violet(270) → blue(230) → cyan(190) → green(120) → yellow(60) → red(0)
-        // then for the top octave continue: red→magenta→violet
-        val hue = when {
-            t < 0.75f -> 270f - (t / 0.75f) * 270f   // violet → red over 75% of range
-            else      -> (t - 0.75f) / 0.25f * (-30f) // red wraps back toward magenta
-        }.let { h -> ((h % 360f) + 360f) % 360f }     // normalise to [0, 360)
+        // Apply scheme — invert t so bass and treble swap ends of the spectrum
+        val tMapped = if (scheme == ColorScheme.INVERSE_RAINBOW) 1f - t else t
+
+        // Hue traversal: violet (270°) → blue → cyan → green → yellow → red (0°)
+        // tMapped = 0 → hue 270° (violet),  tMapped = 1 → hue 0° (red)
+        // We spread evenly over 270° of the wheel (skipping the red-magenta-violet
+        // wrap-around so each band colour stays maximally distinct).
+        val hue = (270f - tMapped * 270f).let { h -> ((h % 360f) + 360f) % 360f }
 
         return hsvToColor(hue, saturation = 1f, value = 1f)
     }
 
-    /**
-     * Convert HSV to Compose [Color] (alpha always 1f).
-     */
     fun hsvToColor(hue: Float, saturation: Float, value: Float): Color {
         val h = hue / 60f
         val i = h.toInt()
