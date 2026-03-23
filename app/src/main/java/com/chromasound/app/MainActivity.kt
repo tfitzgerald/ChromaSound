@@ -29,12 +29,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Extend content behind status and navigation bars
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContent {
-            // Set light-on-dark system bar icons
             val view = LocalView.current
             SideEffect {
                 val win = (view.context as? Activity)?.window ?: return@SideEffect
@@ -46,13 +43,10 @@ class MainActivity : ComponentActivity() {
                 win.navigationBarColor = android.graphics.Color.TRANSPARENT
             }
 
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color    = Color(0xFF050508)
-            ) {
-                val uiState by viewModel.uiState.collectAsState()
+            Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF050508)) {
+                val uiState   by viewModel.uiState.collectAsState()
+                val bandCount by viewModel.bandCount.collectAsState()
 
-                // Permission launcher — result goes straight to the ViewModel
                 val permissionLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission()
                 ) { granted ->
@@ -60,7 +54,6 @@ class MainActivity : ComponentActivity() {
                     else         viewModel.onPermissionDenied()
                 }
 
-                // Fire the system mic-permission dialog when requested
                 LaunchedEffect(uiState) {
                     if (uiState is ChromaSoundUiState.RequestingPermission) {
                         permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -68,9 +61,11 @@ class MainActivity : ComponentActivity() {
                 }
 
                 ChromaSoundScreen(
-                    uiState          = uiState,
-                    onStartRequested = { viewModel.resumeCapture() },
-                    onStopRequested  = { viewModel.stopCapture() }
+                    uiState           = uiState,
+                    bandCount         = bandCount,
+                    onStartRequested  = { viewModel.resumeCapture() },
+                    onStopRequested   = { viewModel.stopCapture() },
+                    onBandCountChange = { viewModel.setBandCount(it) }
                 )
             }
         }
