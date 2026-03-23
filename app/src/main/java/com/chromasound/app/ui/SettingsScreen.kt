@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chromasound.app.model.BandDefinition
 import com.chromasound.app.model.ColorScheme
+import com.chromasound.app.model.ObjectShape
 import com.chromasound.app.model.Settings
 import kotlin.math.roundToInt
 
@@ -45,6 +46,7 @@ fun SettingsScreen(
     var placement      by remember { mutableStateOf(currentSettings.placement) }
     var sensitivity    by remember { mutableStateOf(currentSettings.sensitivity) }
     var colorScheme    by remember { mutableStateOf(currentSettings.colorScheme) }
+    var objectShape    by remember { mutableStateOf(currentSettings.objectShape) }
 
     fun emit() = onSettingsChange(Settings(
         bandCount      = bandCount.roundToInt(),
@@ -54,7 +56,8 @@ fun SettingsScreen(
         maxRadiusPx    = maxRadius.coerceAtLeast(minRadius + 10f),
         placement      = placement,
         sensitivity    = sensitivity,
-        colorScheme    = colorScheme
+        colorScheme    = colorScheme,
+        objectShape    = objectShape
     ))
 
     val bands     = remember(bandCount.roundToInt()) { BandDefinition.build(bandCount.roundToInt()) }
@@ -229,6 +232,54 @@ fun SettingsScreen(
             Spacer(Modifier.height(24.dp))
         }
 
+        // ── 9. Object shape selector ──────────────────────────────────────────
+        item {
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .background(BgCard, RoundedCornerShape(16.dp))
+                    .padding(20.dp)
+            ) {
+                Text("OBJECT SHAPE", color = UiSubtle, fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+                Spacer(Modifier.height(4.dp))
+                Text("Shape used to represent each frequency band",
+                    color = UiText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                Spacer(Modifier.height(16.dp))
+
+                // Row 1: Circle, Star, 2D Box
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ShapeButton(emoji = "●", label = "CIRCLE",
+                        isSelected = objectShape == ObjectShape.CIRCLE,
+                        modifier = Modifier.weight(1f),
+                        onClick = { objectShape = ObjectShape.CIRCLE; emit() })
+                    ShapeButton(emoji = "★", label = "STAR",
+                        isSelected = objectShape == ObjectShape.STAR,
+                        modifier = Modifier.weight(1f),
+                        onClick = { objectShape = ObjectShape.STAR; emit() })
+                    ShapeButton(emoji = "■", label = "2D BOX",
+                        isSelected = objectShape == ObjectShape.BOX_2D,
+                        modifier = Modifier.weight(1f),
+                        onClick = { objectShape = ObjectShape.BOX_2D; emit() })
+                }
+                Spacer(Modifier.height(10.dp))
+                // Row 2: 3D Box, Sphere — with rotating note
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ShapeButton(emoji = "⬡", label = "3D BOX",
+                        subLabel = "rotating",
+                        isSelected = objectShape == ObjectShape.BOX_3D,
+                        modifier = Modifier.weight(1f),
+                        onClick = { objectShape = ObjectShape.BOX_3D; emit() })
+                    ShapeButton(emoji = "◉", label = "SPHERE",
+                        subLabel = "rotating",
+                        isSelected = objectShape == ObjectShape.SPHERE,
+                        modifier = Modifier.weight(1f),
+                        onClick = { objectShape = ObjectShape.SPHERE; emit() })
+                    Spacer(Modifier.weight(1f))
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+
         // ── Band breakdown ────────────────────────────────────────────────────
         item {
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
@@ -343,6 +394,50 @@ private fun ColorSchemeButton(
             Spacer(Modifier.height(6.dp))
             Text("✓  ACTIVE", color = UiAccent, fontSize = 9.sp,
                 fontFamily = FontFamily.Monospace, letterSpacing = 2.sp)
+        }
+    }
+}
+
+@Composable
+private fun ShapeButton(
+    emoji:      String,
+    label:      String,
+    subLabel:   String   = "",
+    isSelected: Boolean,
+    modifier:   Modifier = Modifier,
+    onClick:    () -> Unit
+) {
+    val borderColor = if (isSelected) UiAccent else UiSubtle.copy(alpha = 0.3f)
+    val bgColor     = if (isSelected) UiAccent.copy(alpha = 0.12f) else BgColor
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(bgColor)
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = 14.dp, horizontal = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(emoji, fontSize = 26.sp,
+            color = if (isSelected) UiAccent else UiText)
+        Spacer(Modifier.height(6.dp))
+        Text(label, color = if (isSelected) UiAccent else UiText,
+            fontSize = 10.sp, fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace, letterSpacing = 1.sp,
+            textAlign = TextAlign.Center)
+        if (subLabel.isNotEmpty()) {
+            Text(subLabel, color = UiSubtle, fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center)
+        }
+        if (isSelected) {
+            Spacer(Modifier.height(4.dp))
+            Text("✓", color = UiAccent, fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace)
         }
     }
 }

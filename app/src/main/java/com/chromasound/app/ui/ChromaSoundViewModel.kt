@@ -108,8 +108,7 @@ class ChromaSoundViewModel : ViewModel() {
                 .coerceAtLeast(new.minRadiusPx + 10f),
             placement      = new.placement.coerceIn(Settings.MIN_PLACEMENT, Settings.MAX_PLACEMENT),
             sensitivity    = new.sensitivity.coerceIn(Settings.MIN_SENSITIVITY, Settings.MAX_SENSITIVITY)
-        )
-        _settings.value = s
+        )        _settings.value = s
 
         if (s.bandCount != currentBands.count) {
             currentBands = BandDefinition.build(s.bandCount)

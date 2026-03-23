@@ -11,6 +11,16 @@ enum class ColorScheme {
     INVERSE_RAINBOW
 }
 
+// ── Object shape enum ─────────────────────────────────────────────────────────
+
+enum class ObjectShape {
+    CIRCLE,     // default — glowing disc
+    STAR,       // 5-pointed star
+    BOX_2D,     // flat square
+    BOX_3D,     // isometric rotating 3-D box (wireframe)
+    SPHERE      // shaded sphere with rotating latitude/longitude lines
+}
+
 // ── User-adjustable settings ──────────────────────────────────────────────────
 
 data class Settings(
@@ -19,14 +29,10 @@ data class Settings(
     val circlesPerBand: Int         = 1,
     val minRadiusPx:    Float       = 10f,
     val maxRadiusPx:    Float       = 160f,
-    // 0.0 = every circle locked to band centre column
-    // 1.0 = circles scatter freely across the full screen width
     val placement:      Float       = 0.3f,
-    // Multiplier applied to raw dB values before threshold comparison.
-    // < 1.0 = less sensitive (only loud sounds trigger circles)
-    // > 1.0 = more sensitive (quiet sounds also trigger circles)
     val sensitivity:    Float       = 1.0f,
-    val colorScheme:    ColorScheme = ColorScheme.RAINBOW
+    val colorScheme:    ColorScheme = ColorScheme.RAINBOW,
+    val objectShape:    ObjectShape = ObjectShape.CIRCLE
 ) {
     companion object {
         const val MIN_LIFETIME_MS      = 100L
