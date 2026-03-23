@@ -16,29 +16,27 @@ import kotlin.math.log10
 import kotlin.math.max
 import kotlin.math.sqrt
 
-/**
- * Captures raw microphone audio and emits [AudioFrame]s.
- *
- * @param bands       Lambda returning the current [BandDefinition] — read each frame.
- * @param sensitivity Lambda returning the current sensitivity multiplier (0.1 – 3.0).
- *                    Applied as a gain to raw dB levels before threshold comparison:
- *                    values > 1 make quiet sounds trigger circles, < 1 requires louder input.
- */
 class AudioCaptureEngine {
 
     companion object {
         const val SAMPLE_RATE        = 44100
         const val FFT_SIZE           = 4096
         const val DB_FLOOR           = -80f
-        const val DB_SPAWN_THRESHOLD = -50f   // base threshold before sensitivity scaling
+        const val DB_SPAWN_THRESHOLD = -50f
         const val SILENCE_THRESHOLD  = 0.002f
     }
 
     private val hannWindow = FFTEngine.hannWindow(FFT_SIZE)
 
+    /**
+     * @param bands       Current [BandDefinition] — read each frame.
+     * @param sensitivity dB gain multiplier — read each frame.
+     * @param subBands    Number of sub-bands per band for shading — read each frame.
+     */
     fun audioFrameFlow(
         bands:       () -> BandDefinition,
-        sensitivity: () -> Float
+        sensitivity: () -> Float,
+        subBands:    () -> Int
     ): Flow<AudioFrame> = flow {
 
         val minBuf     = AudioRecord.getMinBufferSize(
@@ -48,10 +46,8 @@ class AudioCaptureEngine {
 
         val recorder = AudioRecord(
             MediaRecorder.AudioSource.UNPROCESSED,
-            SAMPLE_RATE,
-            AudioFormat.CHANNEL_IN_MONO,
-            AudioFormat.ENCODING_PCM_FLOAT,
-            bufferSize
+            SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_FLOAT, bufferSize
         )
         require(recorder.state == AudioRecord.STATE_INITIALIZED) {
             "AudioRecord failed to initialise — check RECORD_AUDIO permission"
@@ -71,7 +67,7 @@ class AudioCaptureEngine {
                 }
                 if (totalRead < FFT_SIZE) continue
 
-                // RMS amplitude
+                // RMS
                 var sumSq = 0.0
                 for (s in pcm) sumSq += s * s
                 val rms = sqrt(sumSq / FFT_SIZE).toFloat().coerceIn(0f, 1f)
@@ -80,24 +76,23 @@ class AudioCaptureEngine {
                 for (i in 0 until FFT_SIZE) windowed[i] = pcm[i] * hannWindow[i]
                 val magnitudes = FFTEngine.computeMagnitudes(windowed)
 
-                // dBFS per bin — raw values before sensitivity
+                // Raw dBFS per bin
                 val rawDb = FloatArray(magnitudes.size) { i ->
                     val mag = magnitudes[i]
                     if (mag < 1e-10f) DB_FLOOR
                     else max(20f * log10(mag.toDouble()).toFloat(), DB_FLOOR)
                 }
 
-                // Apply sensitivity: multiply dB values so they "shift" toward the threshold.
-                // sensitivity = 1.0 → no change
-                // sensitivity = 2.0 → a -60 dB signal is treated as -30 dB (easier to trigger)
-                // sensitivity = 0.5 → a -30 dB signal is treated as -60 dB (harder to trigger)
-                val gain = sensitivity().coerceIn(0.1f, 3.0f)
+                // Apply sensitivity gain
+                val gain     = sensitivity().coerceIn(0.1f, 3.0f)
                 val dBLevels = FloatArray(rawDb.size) { i ->
                     (rawDb[i] * gain).coerceIn(DB_FLOOR, 0f)
                 }
 
-                // Per-band: loudest boosted bin above threshold, or -1 if silent
-                val bd = bands()
+                val bd  = bands()
+                val nsb = subBands().coerceIn(1, 12)
+
+                // ── Per-band peak bin ─────────────────────────────────────────
                 val bandPeakBins = IntArray(bd.count) { -1 }
 
                 if (rms > SILENCE_THRESHOLD) {
@@ -114,7 +109,46 @@ class AudioCaptureEngine {
                     }
                 }
 
-                emit(AudioFrame(magnitudes, rms, dBLevels, bandPeakBins))
+                // ── Sub-band energies ─────────────────────────────────────────
+                // For each band, split its frequency range into nsb equal (in log
+                // space) slices. Average the magnitude of all FFT bins in each
+                // slice, normalised to [0, 1] relative to the band's peak bin.
+                val bandSubEnergies = Array(bd.count) { band ->
+                    val loHz  = bd.lowerHz[band].toDouble()
+                    val hiHz  = bd.upperHz[band].toDouble()
+                    val logLo = Math.log10(loHz)
+                    val logHi = Math.log10(hiHz)
+                    val step  = (logHi - logLo) / nsb
+
+                    // Peak magnitude in this band (for normalisation)
+                    val peakBin = bandPeakBins[band]
+                    val peakMag = if (peakBin >= 0 && peakBin < magnitudes.size)
+                        magnitudes[peakBin].toDouble() else 0.0
+
+                    FloatArray(nsb) { sub ->
+                        val subLoHz = Math.pow(10.0, logLo + sub       * step)
+                        val subHiHz = Math.pow(10.0, logLo + (sub + 1) * step)
+                        val subLoBin = (subLoHz * FFT_SIZE / SAMPLE_RATE).toInt()
+                            .coerceIn(1, magnitudes.size - 1)
+                        val subHiBin = (subHiHz * FFT_SIZE / SAMPLE_RATE).toInt()
+                            .coerceIn(subLoBin, magnitudes.size - 1)
+
+                        // Average magnitude across all bins in this sub-band slice
+                        var sum   = 0.0
+                        var count = 0
+                        for (bin in subLoBin..subHiBin) {
+                            sum += magnitudes[bin]
+                            count++
+                        }
+                        val avg = if (count > 0) sum / count else 0.0
+
+                        // Normalise: 1.0 = as loud as the peak bin, 0.0 = silent
+                        val energy = if (peakMag > 0.0) (avg / peakMag).toFloat() else 0f
+                        energy.coerceIn(0f, 1f)
+                    }
+                }
+
+                emit(AudioFrame(magnitudes, rms, dBLevels, bandPeakBins, bandSubEnergies))
             }
         } finally {
             recorder.stop()

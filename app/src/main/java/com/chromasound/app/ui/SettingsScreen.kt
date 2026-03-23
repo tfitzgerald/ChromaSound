@@ -47,6 +47,7 @@ fun SettingsScreen(
     var sensitivity    by remember { mutableStateOf(currentSettings.sensitivity) }
     var colorScheme    by remember { mutableStateOf(currentSettings.colorScheme) }
     var objectShape    by remember { mutableStateOf(currentSettings.objectShape) }
+    var subBands       by remember { mutableStateOf(currentSettings.subBands.toFloat()) }
 
     fun emit() = onSettingsChange(Settings(
         bandCount      = bandCount.roundToInt(),
@@ -57,7 +58,8 @@ fun SettingsScreen(
         placement      = placement,
         sensitivity    = sensitivity,
         colorScheme    = colorScheme,
-        objectShape    = objectShape
+        objectShape    = objectShape,
+        subBands       = subBands.roundToInt()
     ))
 
     val bands     = remember(bandCount.roundToInt()) { BandDefinition.build(bandCount.roundToInt()) }
@@ -190,7 +192,22 @@ fun SettingsScreen(
             Spacer(Modifier.height(14.dp))
         }
 
-        // ── 8. Color scheme toggle ────────────────────────────────────────────
+        // ── 8. Sub-band shading ───────────────────────────────────────────────
+        item {
+            SettingCard("SUB-BAND SHADING",
+                "Radial shading rings from centre to edge (1 = solid colour)",
+                value = if (subBands.roundToInt() == 1) "Off" else "${subBands.roundToInt()}",
+                unit  = if (subBands.roundToInt() == 1) "" else "rings") {
+                Slider(value = subBands, onValueChange = { subBands = it; emit() },
+                    valueRange = Settings.MIN_SUB_BANDS.toFloat()..Settings.MAX_SUB_BANDS.toFloat(),
+                    steps  = Settings.MAX_SUB_BANDS - Settings.MIN_SUB_BANDS - 1,
+                    colors = sliderColors, modifier = Modifier.fillMaxWidth())
+                SliderLabels("Off (1)", "${Settings.MAX_SUB_BANDS} rings")
+            }
+            Spacer(Modifier.height(14.dp))
+        }
+
+        // ── 9. Color scheme toggle ────────────────────────────────────────────
         item {
             Column(
                 modifier = Modifier.fillMaxWidth()
@@ -232,7 +249,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(24.dp))
         }
 
-        // ── 9. Object shape selector ──────────────────────────────────────────
+        // ── 10. Object shape selector ──────────────────────────────────────────
         item {
             Column(
                 modifier = Modifier.fillMaxWidth()

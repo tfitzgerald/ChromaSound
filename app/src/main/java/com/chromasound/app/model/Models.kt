@@ -5,23 +5,21 @@ import androidx.compose.ui.graphics.Color
 // ── Color scheme enum ─────────────────────────────────────────────────────────
 
 enum class ColorScheme {
-    /** Bass = violet → treble = red  (matches visible light spectrum) */
     RAINBOW,
-    /** Bass = red → treble = violet  (inverted spectrum) */
     INVERSE_RAINBOW
 }
 
 // ── Object shape enum ─────────────────────────────────────────────────────────
 
 enum class ObjectShape {
-    CIRCLE,     // default — glowing disc
-    STAR,       // 5-pointed star
-    BOX_2D,     // flat square
-    BOX_3D,     // isometric rotating 3-D box (wireframe)
-    SPHERE      // shaded sphere with rotating latitude/longitude lines
+    CIRCLE,
+    STAR,
+    BOX_2D,
+    BOX_3D,
+    SPHERE
 }
 
-// ── User-adjustable settings ──────────────────────────────────────────────────
+// ── Settings ──────────────────────────────────────────────────────────────────
 
 data class Settings(
     val bandCount:      Int         = BandDefinition.DEFAULT_BANDS,
@@ -32,7 +30,11 @@ data class Settings(
     val placement:      Float       = 0.3f,
     val sensitivity:    Float       = 1.0f,
     val colorScheme:    ColorScheme = ColorScheme.RAINBOW,
-    val objectShape:    ObjectShape = ObjectShape.CIRCLE
+    val objectShape:    ObjectShape = ObjectShape.CIRCLE,
+    // How many radial shading rings to draw inside each shape.
+    // 1 = solid colour, 2–12 = rings from centre outward, each tinted
+    // by the energy of that sub-band slice within the frequency band.
+    val subBands:       Int         = 4
 ) {
     companion object {
         const val MIN_LIFETIME_MS      = 100L
@@ -47,37 +49,59 @@ data class Settings(
         const val MAX_PLACEMENT        = 1f
         const val MIN_SENSITIVITY      = 0.1f
         const val MAX_SENSITIVITY      = 3.0f
+        const val MIN_SUB_BANDS        = 1
+        const val MAX_SUB_BANDS        = 12
     }
 }
 
-// ── Circle model ──────────────────────────────────────────────────────────────
+// ── FrequencyCircle ───────────────────────────────────────────────────────────
 
+/**
+ * @param subBandEnergies  Normalised energy (0–1) for each sub-band slice within
+ *                         this band, ordered lowest→highest frequency (= centre→edge).
+ *                         Length equals [Settings.subBands] at spawn time.
+ *                         Used to shade each radial ring independently.
+ */
 data class FrequencyCircle(
-    val bandIndex:    Int,
-    val slotIndex:    Int,
-    val x:            Float,
-    val y:            Float,
-    val radiusPx:     Float,
-    val color:        Color,
-    val spawnTimeMs:  Long,
-    val lifetimeMs:   Long,
-    val centreHz:     Float,
-    val decibelLevel: Float
+    val bandIndex:       Int,
+    val slotIndex:       Int,
+    val x:               Float,
+    val y:               Float,
+    val radiusPx:        Float,
+    val color:           Color,
+    val spawnTimeMs:     Long,
+    val lifetimeMs:      Long,
+    val centreHz:        Float,
+    val decibelLevel:    Float,
+    val subBandEnergies: FloatArray = FloatArray(1) { 1f }
 ) {
     fun lifeFraction(nowMs: Long): Float {
         val age = (nowMs - spawnTimeMs).coerceAtLeast(0L)
         return (1f - age.toFloat() / lifetimeMs).coerceIn(0f, 1f)
     }
     fun isAlive(nowMs: Long): Boolean = (nowMs - spawnTimeMs) < lifetimeMs
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is FrequencyCircle) return false
+        return bandIndex == other.bandIndex && slotIndex == other.slotIndex &&
+               spawnTimeMs == other.spawnTimeMs
+    }
+    override fun hashCode(): Int = 31 * (31 * bandIndex + slotIndex) + spawnTimeMs.toInt()
 }
 
-// ── Audio frame ───────────────────────────────────────────────────────────────
+// ── AudioFrame ────────────────────────────────────────────────────────────────
 
+/**
+ * @param bandSubEnergies  [bandIndex][subBandIndex] → normalised energy (0–1).
+ *                         Outer array length = band count; inner = sub-band count.
+ */
 data class AudioFrame(
-    val magnitudes:    FloatArray = FloatArray(0),
-    val rmsVolume:     Float      = 0f,
-    val decibelLevels: FloatArray = FloatArray(0),
-    val bandPeakBins:  IntArray   = IntArray(0)
+    val magnitudes:      FloatArray       = FloatArray(0),
+    val rmsVolume:       Float            = 0f,
+    val decibelLevels:   FloatArray       = FloatArray(0),
+    val bandPeakBins:    IntArray         = IntArray(0),
+    val bandSubEnergies: Array<FloatArray> = emptyArray()
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -87,7 +111,7 @@ data class AudioFrame(
     override fun hashCode(): Int = rmsVolume.hashCode()
 }
 
-// ── Band definition ───────────────────────────────────────────────────────────
+// ── BandDefinition ────────────────────────────────────────────────────────────
 
 data class BandDefinition(
     val count:    Int,

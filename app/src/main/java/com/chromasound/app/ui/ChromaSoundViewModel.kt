@@ -10,7 +10,6 @@ import com.chromasound.app.audio.AudioCaptureEngine.Companion.SAMPLE_RATE
 import com.chromasound.app.fft.FrequencyColorMapper
 import com.chromasound.app.model.AudioFrame
 import com.chromasound.app.model.BandDefinition
-import com.chromasound.app.model.ColorScheme
 import com.chromasound.app.model.FrequencyCircle
 import com.chromasound.app.model.Settings
 import kotlinx.coroutines.Job
@@ -66,29 +65,14 @@ class ChromaSoundViewModel : ViewModel() {
             return (minPx + normalized.coerceIn(0f, 1f) * (maxPx - minPx))
         }
 
-        /**
-         * Compute the X position for a circle.
-         *
-         * placement = 0.0 → locked to band centre column, no scatter.
-         * placement = 1.0 → can land anywhere across the full screen width.
-         */
         fun computeX(band: Int, bandCount: Int, placement: Float): Float {
-            val centre   = (band + 0.5f) / bandCount
-            val halfBand = 0.5f / bandCount
+            val centre    = (band + 0.5f) / bandCount
+            val halfBand  = 0.5f / bandCount
             val maxOffset = halfBand + placement * (0.5f - halfBand)
-            val jitter   = (Random.nextFloat() * 2f - 1f) * maxOffset * placement
+            val jitter    = (Random.nextFloat() * 2f - 1f) * maxOffset * placement
             return (centre + jitter).coerceIn(0.02f, 0.98f)
         }
 
-        /**
-         * Compute the Y position for a circle.
-         *
-         * placement = 0.0 → all circles sit exactly on the horizontal centre line (Y = 0.5).
-         * placement = 1.0 → circles scatter freely across the full screen height.
-         *
-         * The scatter window grows linearly with placement, so the transition
-         * from a tight centre band to full-screen scatter is smooth and continuous.
-         */
         fun computeY(placement: Float): Float {
             val maxOffset = placement * 0.45f
             val jitter    = (Random.nextFloat() * 2f - 1f) * maxOffset
@@ -107,7 +91,8 @@ class ChromaSoundViewModel : ViewModel() {
             maxRadiusPx    = new.maxRadiusPx.coerceIn(Settings.MIN_RADIUS_CEILING, Settings.MAX_RADIUS_CEILING)
                 .coerceAtLeast(new.minRadiusPx + 10f),
             placement      = new.placement.coerceIn(Settings.MIN_PLACEMENT, Settings.MAX_PLACEMENT),
-            sensitivity    = new.sensitivity.coerceIn(Settings.MIN_SENSITIVITY, Settings.MAX_SENSITIVITY)
+            sensitivity    = new.sensitivity.coerceIn(Settings.MIN_SENSITIVITY, Settings.MAX_SENSITIVITY),
+            subBands       = new.subBands.coerceIn(Settings.MIN_SUB_BANDS, Settings.MAX_SUB_BANDS)
         )
         _settings.value = s
 
@@ -127,7 +112,8 @@ class ChromaSoundViewModel : ViewModel() {
         captureJob = viewModelScope.launch {
             engine.audioFrameFlow(
                 bands       = { currentBands },
-                sensitivity = { _settings.value.sensitivity }
+                sensitivity = { _settings.value.sensitivity },
+                subBands    = { _settings.value.subBands }
             )
                 .catch { _uiState.value = ChromaSoundUiState.Idle }
                 .collect { frame -> processFrame(frame) }
@@ -163,7 +149,7 @@ class ChromaSoundViewModel : ViewModel() {
                 if (c != null && !c.isAlive(nowMs)) bandSlots[band][slot] = null
             }
 
-        // Spawn from peak bins
+        // Spawn new circles
         val peakBins = frame.bandPeakBins
         for (band in 0 until minOf(bd.count, peakBins.size)) {
             val peakBin = peakBins[band]
@@ -172,27 +158,31 @@ class ChromaSoundViewModel : ViewModel() {
             val db       = frame.decibelLevels.getOrElse(peakBin) { DB_FLOOR }
             val centreHz = bd.centreHz[band]
 
-            // Find oldest/emptiest slot
             val targetSlot = (0 until s.circlesPerBand).minByOrNull { slot ->
                 bandSlots[band][slot]?.lifeFraction(nowMs) ?: -1f
             } ?: 0
 
-            // Both X and Y are driven by the placement slider.
-            // Y = 0.5 (centre line) when placement = 0, full scatter when placement = 1.
             val y = computeY(s.placement)
             val x = computeX(band, bd.count, s.placement)
 
+            // Retrieve sub-band energies for this band from the audio frame
+            val subEnergies = if (band < frame.bandSubEnergies.size)
+                frame.bandSubEnergies[band]
+            else
+                FloatArray(s.subBands) { 1f }
+
             bandSlots[band][targetSlot] = FrequencyCircle(
-                bandIndex    = band,
-                slotIndex    = targetSlot,
-                x            = x,
-                y            = y,
-                radiusPx     = dbToRadius(db, s.minRadiusPx, s.maxRadiusPx),
-                color        = FrequencyColorMapper.frequencyToColor(centreHz, s.colorScheme),
-                spawnTimeMs  = nowMs,
-                lifetimeMs   = s.lifetimeMs,
-                centreHz     = centreHz,
-                decibelLevel = db
+                bandIndex       = band,
+                slotIndex       = targetSlot,
+                x               = x,
+                y               = y,
+                radiusPx        = dbToRadius(db, s.minRadiusPx, s.maxRadiusPx),
+                color           = FrequencyColorMapper.frequencyToColor(centreHz, s.colorScheme),
+                spawnTimeMs     = nowMs,
+                lifetimeMs      = s.lifetimeMs,
+                centreHz        = centreHz,
+                decibelLevel    = db,
+                subBandEnergies = subEnergies
             )
         }
 
