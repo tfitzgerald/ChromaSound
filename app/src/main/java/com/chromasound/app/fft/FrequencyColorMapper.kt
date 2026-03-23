@@ -3,47 +3,35 @@ package com.chromasound.app.fft
 import androidx.compose.ui.graphics.Color
 import com.chromasound.app.model.ColorScheme
 
-/**
- * Maps a frequency in Hz to a fully-opaque colour.
- *
- * RAINBOW        Bass (30 Hz) = violet  →  Treble (11 kHz) = red
- * INVERSE_RAINBOW Bass (30 Hz) = red    →  Treble (11 kHz) = violet
- *
- * Both schemes traverse the full visible-light hue wheel so every band
- * always gets a distinct, saturated colour.
- */
 object FrequencyColorMapper {
 
     private const val MIN_HZ =   30f
     private const val MAX_HZ = 11_000f
 
-    /**
-     * Return the color for [bandIndex] / [hz], checking [overrides] first.
-     * If an override exists for the band it is returned directly (alpha = 1f).
-     * Otherwise the automatic hue mapping via [scheme] is used.
-     */
+    /** Return the colour for [bandIndex], checking [overrides] before the auto scheme. */
     fun colorForBand(
         bandIndex: Int,
         hz:        Float,
-        scheme:    ColorScheme       = ColorScheme.RAINBOW,
-        overrides: Map<Int, androidx.compose.ui.graphics.Color> = emptyMap()
-    ): androidx.compose.ui.graphics.Color {
+        scheme:    ColorScheme      = ColorScheme.RAINBOW,
+        overrides: Map<Int, Color>  = emptyMap()
+    ): Color {
         overrides[bandIndex]?.let { return it.copy(alpha = 1f) }
         return frequencyToColor(hz, scheme)
     }
 
-    fun frequencyToColor(hz: Float, scheme: ColorScheme = ColorScheme.RAINBOW): androidx.compose.ui.graphics.Color {
-    fun frequencyToColor(hz: Float, scheme: ColorScheme = ColorScheme.RAINBOW): androidx.compose.ui.graphics.Color {
-        val logMin = Math.log10(MIN_HZ.toDouble())
-        val logMax = Math.log10(MAX_HZ.toDouble())
-        val logHz  = Math.log10(hz.toDouble().coerceIn(MIN_HZ.toDouble(), MAX_HZ.toDouble()))
-        val t = ((logHz - logMin) / (logMax - logMin)).toFloat().coerceIn(0f, 1f)
+    /** Convert a frequency in Hz to a fully-opaque Color using the given color scheme. */
+    fun frequencyToColor(hz: Float, scheme: ColorScheme = ColorScheme.RAINBOW): Color {
+        val logMin  = Math.log10(MIN_HZ.toDouble())
+        val logMax  = Math.log10(MAX_HZ.toDouble())
+        val logHz   = Math.log10(hz.toDouble().coerceIn(MIN_HZ.toDouble(), MAX_HZ.toDouble()))
+        val t       = ((logHz - logMin) / (logMax - logMin)).toFloat().coerceIn(0f, 1f)
         val tMapped = if (scheme == ColorScheme.INVERSE_RAINBOW) 1f - t else t
-        val hue = (270f - tMapped * 270f).let { h -> ((h % 360f) + 360f) % 360f }
+        val hue     = (270f - tMapped * 270f).let { h -> ((h % 360f) + 360f) % 360f }
         return hsvToColor(hue, saturation = 1f, value = 1f)
     }
 
-    fun hsvToColor(hue: Float, saturation: Float, value: Float): androidx.compose.ui.graphics.Color {
+    /** Convert HSV components to a fully-opaque Compose Color. */
+    fun hsvToColor(hue: Float, saturation: Float, value: Float): Color {
         val h = hue / 60f
         val i = h.toInt()
         val f = h - i

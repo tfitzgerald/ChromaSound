@@ -25,7 +25,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chromasound.app.fft.FrequencyColorMapper
@@ -278,13 +277,13 @@ private fun HsvColorPicker(
                 drawRect(
                     brush = Brush.horizontalGradient(
                         colors = listOf(
-                            Color.hsv(0f,   1f, 1f),
-                            Color.hsv(60f,  1f, 1f),
-                            Color.hsv(120f, 1f, 1f),
-                            Color.hsv(180f, 1f, 1f),
-                            Color.hsv(240f, 1f, 1f),
-                            Color.hsv(300f, 1f, 1f),
-                            Color.hsv(360f, 1f, 1f)
+                            FrequencyColorMapper.hsvToColor(0f,   1f, 1f),
+                            FrequencyColorMapper.hsvToColor(60f,  1f, 1f),
+                            FrequencyColorMapper.hsvToColor(120f, 1f, 1f),
+                            FrequencyColorMapper.hsvToColor(180f, 1f, 1f),
+                            FrequencyColorMapper.hsvToColor(240f, 1f, 1f),
+                            FrequencyColorMapper.hsvToColor(300f, 1f, 1f),
+                            FrequencyColorMapper.hsvToColor(360f, 1f, 1f)
                         )
                     )
                 )
@@ -348,7 +347,7 @@ private fun HsvColorPicker(
         ) {
             Box(
                 Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))
-                    .background(pickedColor)
+                    .background(color = pickedColor)
                     .border(1.dp, UiSubtle.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
             )
             Column {
@@ -419,6 +418,3 @@ private fun colorToHex(color: Color): String {
 private fun formatBandHz(hz: Float): String =
     if (hz >= 1000f) "${"%.1f".format(hz / 1000f)} kHz" else "${hz.toInt()} Hz"
 
-// Kotlin doesn't expose Color.hsv directly in older compose versions, wrap it:
-private fun Color.Companion.hsv(h: Float, s: Float, v: Float): Color =
-    FrequencyColorMapper.hsvToColor(h, s, v)

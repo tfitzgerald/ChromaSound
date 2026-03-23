@@ -58,7 +58,6 @@ fun ChromaSoundScreen(
             onClose          = { showSettings = false },
             onOpenBandColors = { showSettings = false; showBandColors = true }
         )
-    } else {
         else -> Box(
             modifier = Modifier.fillMaxSize().background(BgColor),
             contentAlignment = Alignment.Center
