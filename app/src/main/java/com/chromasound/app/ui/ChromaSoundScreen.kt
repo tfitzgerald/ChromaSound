@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chromasound.app.model.FrequencyCircle
+import com.chromasound.app.model.Settings
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 private val BgColor  = Color(0xFF050508)
@@ -33,17 +34,17 @@ private val UiSubtle = Color(0xFF5A5870)
 @Composable
 fun ChromaSoundScreen(
     uiState: ChromaSoundUiState,
-    bandCount: Int,
+    settings: Settings,
     onStartRequested: () -> Unit,
     onStopRequested:  () -> Unit,
-    onBandCountChange: (Int) -> Unit
+    onSettingsChange: (Settings) -> Unit
 ) {
     var showSettings by remember { mutableStateOf(false) }
 
     if (showSettings) {
         SettingsScreen(
-            currentBandCount  = bandCount,
-            onBandCountChange = onBandCountChange,
+            currentSettings  = settings,
+            onSettingsChange = onSettingsChange,
             onClose           = { showSettings = false }
         )
     } else {

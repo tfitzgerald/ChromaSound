@@ -11,6 +11,7 @@ import com.chromasound.app.fft.FrequencyColorMapper
 import com.chromasound.app.model.AudioFrame
 import com.chromasound.app.model.BandDefinition
 import com.chromasound.app.model.FrequencyCircle
+import com.chromasound.app.model.Settings
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,12 +26,12 @@ sealed interface ChromaSoundUiState {
     data object RequestingPermission : ChromaSoundUiState
     data object PermissionDenied     : ChromaSoundUiState
     data class Running(
-        val circles: List<FrequencyCircle> = emptyList(),
-        val rmsVolume: Float = 0f,
-        val activeCount: Int = 0,
-        val bandCount: Int = BandDefinition.DEFAULT_BANDS,
-        val peakHz: String = "",
-        val peakDb: String = ""
+        val circles:     List<FrequencyCircle> = emptyList(),
+        val rmsVolume:   Float = 0f,
+        val activeCount: Int   = 0,
+        val bandCount:   Int   = BandDefinition.DEFAULT_BANDS,
+        val peakHz:      String = "",
+        val peakDb:      String = ""
     ) : ChromaSoundUiState
 }
 
@@ -43,48 +44,63 @@ class ChromaSoundViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<ChromaSoundUiState>(ChromaSoundUiState.Idle)
     val uiState: StateFlow<ChromaSoundUiState> = _uiState.asStateFlow()
 
-    // Current band count — survives navigation to/from settings
-    private val _bandCount = MutableStateFlow(BandDefinition.DEFAULT_BANDS)
-    val bandCount: StateFlow<Int> = _bandCount.asStateFlow()
+    // Single source of truth for all user settings
+    private val _settings = MutableStateFlow(Settings())
+    val settings: StateFlow<Settings> = _settings.asStateFlow()
 
-    // Rebuilt whenever bandCount changes; read by the audio coroutine
+    // Derived band definition — rebuilt whenever bandCount changes
     @Volatile private var currentBands = BandDefinition.build(BandDefinition.DEFAULT_BANDS)
 
-    // One circle slot per band — resized when band count changes
-    private var bandCircle = arrayOfNulls<FrequencyCircle>(BandDefinition.DEFAULT_BANDS)
+    // Circle slots: [band][slot] — outer array resizes with bandCount,
+    // inner array resizes with circlesPerBand
+    @Volatile private var bandSlots =
+        Array(BandDefinition.DEFAULT_BANDS) { arrayOfNulls<FrequencyCircle>(1) }
 
     private var captureJob: Job? = null
 
     companion object {
-        private const val MIN_RADIUS_PX = 10f
-        private const val MAX_RADIUS_PX = 160f
-
-        fun dbToRadius(db: Float): Float {
-            val range      = 0f - DB_SPAWN_THRESHOLD
-            val normalized = (db - DB_SPAWN_THRESHOLD) / range
-            return MIN_RADIUS_PX + normalized.coerceIn(0f, 1f) * (MAX_RADIUS_PX - MIN_RADIUS_PX)
-        }
+        fun binToHz(bin: Int): Float =
+            bin.toFloat() * SAMPLE_RATE.toFloat() / FFT_SIZE.toFloat()
 
         fun formatHz(hz: Float) =
             if (hz >= 1000f) "${"%.1f".format(hz / 1000f)} kHz" else "${hz.toInt()} Hz"
+
+        /** Map a dB level to a pixel radius using the current min/max settings. */
+        fun dbToRadius(db: Float, minPx: Float, maxPx: Float): Float {
+            val range      = 0f - DB_SPAWN_THRESHOLD          // e.g. 50 dB of usable range
+            val normalized = (db - DB_SPAWN_THRESHOLD) / range
+            return (minPx + normalized.coerceIn(0f, 1f) * (maxPx - minPx))
+        }
     }
 
     // ── Settings API ──────────────────────────────────────────────────────────
 
-    fun setBandCount(count: Int) {
-        val clamped = count.coerceIn(BandDefinition.MIN_BANDS, BandDefinition.MAX_BANDS)
-        if (clamped == _bandCount.value) return
-        _bandCount.value = clamped
-        currentBands     = BandDefinition.build(clamped)
-        // Resize the slot array — old circles are discarded (they'd be in wrong slots)
-        bandCircle       = arrayOfNulls(clamped)
+    fun updateSettings(newSettings: Settings) {
+        val s = newSettings.copy(
+            bandCount      = newSettings.bandCount.coerceIn(BandDefinition.MIN_BANDS, BandDefinition.MAX_BANDS),
+            lifetimeMs     = newSettings.lifetimeMs.coerceIn(Settings.MIN_LIFETIME_MS, Settings.MAX_LIFETIME_MS),
+            circlesPerBand = newSettings.circlesPerBand.coerceIn(Settings.MIN_CIRCLES_PER_BAND, Settings.MAX_CIRCLES_PER_BAND),
+            minRadiusPx    = newSettings.minRadiusPx.coerceIn(Settings.MIN_RADIUS_FLOOR, Settings.MAX_RADIUS_FLOOR),
+            maxRadiusPx    = newSettings.maxRadiusPx.coerceIn(Settings.MIN_RADIUS_CEILING, Settings.MAX_RADIUS_CEILING)
+                .coerceAtLeast(newSettings.minRadiusPx + 10f)   // max always > min
+        )
+        _settings.value = s
+
+        // Rebuild bands if count changed
+        if (s.bandCount != currentBands.count) {
+            currentBands = BandDefinition.build(s.bandCount)
+            bandSlots    = Array(s.bandCount) { arrayOfNulls(s.circlesPerBand) }
+        } else if (s.circlesPerBand != bandSlots[0].size) {
+            // Resize inner slot arrays
+            bandSlots = Array(s.bandCount) { arrayOfNulls(s.circlesPerBand) }
+        }
     }
 
     // ── Capture lifecycle ─────────────────────────────────────────────────────
 
     fun onPermissionGranted() {
         if (captureJob?.isActive == true) return
-        _uiState.value = ChromaSoundUiState.Running(bandCount = _bandCount.value)
+        _uiState.value = ChromaSoundUiState.Running(bandCount = _settings.value.bandCount)
         captureJob = viewModelScope.launch {
             engine.audioFrameFlow { currentBands }
                 .catch { _uiState.value = ChromaSoundUiState.Idle }
@@ -92,37 +108,38 @@ class ChromaSoundViewModel : ViewModel() {
         }
     }
 
-    fun onPermissionDenied() {
-        _uiState.value = ChromaSoundUiState.PermissionDenied
-    }
+    fun onPermissionDenied() { _uiState.value = ChromaSoundUiState.PermissionDenied }
 
     fun stopCapture() {
         captureJob?.cancel()
         captureJob = null
-        bandCircle.fill(null)
+        bandSlots.forEach { it.fill(null) }
         _uiState.value = ChromaSoundUiState.Idle
     }
 
-    fun resumeCapture() {
-        _uiState.value = ChromaSoundUiState.RequestingPermission
-    }
+    fun resumeCapture() { _uiState.value = ChromaSoundUiState.RequestingPermission }
 
     // ── Frame processing ──────────────────────────────────────────────────────
 
     private fun processFrame(frame: AudioFrame) {
         val nowMs = System.currentTimeMillis()
+        val s     = _settings.value
         val bd    = currentBands
 
-        // Resize slot array if band count changed between frames
-        if (bandCircle.size != bd.count) bandCircle = arrayOfNulls(bd.count)
-
-        // Expire dead circles
-        for (b in 0 until bd.count) {
-            val c = bandCircle[b]
-            if (c != null && !c.isAlive(nowMs)) bandCircle[b] = null
+        // Resize slot grid if settings changed between frames
+        if (bandSlots.size != bd.count || bandSlots[0].size != s.circlesPerBand) {
+            bandSlots = Array(bd.count) { arrayOfNulls(s.circlesPerBand) }
         }
 
-        // Spawn one circle per active band
+        // Expire dead circles in every slot
+        for (band in 0 until bd.count) {
+            for (slot in 0 until s.circlesPerBand) {
+                val c = bandSlots[band][slot]
+                if (c != null && !c.isAlive(nowMs)) bandSlots[band][slot] = null
+            }
+        }
+
+        // Spawn new circles from peak bins
         val peakBins = frame.bandPeakBins
         for (band in 0 until minOf(bd.count, peakBins.size)) {
             val peakBin = peakBins[band]
@@ -131,19 +148,33 @@ class ChromaSoundViewModel : ViewModel() {
             val db       = frame.decibelLevels.getOrElse(peakBin) { DB_FLOOR }
             val centreHz = bd.centreHz[band]
 
-            bandCircle[band] = FrequencyCircle(
+            // Find the oldest (lowest-life) slot to replace
+            val targetSlot = (0 until s.circlesPerBand).minByOrNull { slot ->
+                val c = bandSlots[band][slot]
+                c?.lifeFraction(nowMs) ?: -1f   // null slots are "most expired"
+            } ?: 0
+
+            // Spread multiple circles within the band column with vertical jitter
+            val bandFraction = (band + 0.5f) / bd.count
+            val slotFraction  = if (s.circlesPerBand == 1) 0f
+                                else (targetSlot / (s.circlesPerBand - 1f)) - 0.5f
+            val y = (0.5f + slotFraction * 0.3f).coerceIn(0.1f, 0.9f)
+
+            bandSlots[band][targetSlot] = FrequencyCircle(
                 bandIndex    = band,
-                x            = (band + 0.5f) / bd.count,
-                y            = if (band % 2 == 0) 0.55f else 0.45f,
-                radiusPx     = dbToRadius(db),
+                slotIndex    = targetSlot,
+                x            = bandFraction,
+                y            = y,
+                radiusPx     = dbToRadius(db, s.minRadiusPx, s.maxRadiusPx),
                 color        = FrequencyColorMapper.frequencyToColor(centreHz),
                 spawnTimeMs  = nowMs,
+                lifetimeMs   = s.lifetimeMs,
                 centreHz     = centreHz,
                 decibelLevel = db
             )
         }
 
-        val alive   = bandCircle.filterNotNull()
+        val alive   = bandSlots.flatMap { it.filterNotNull() }
         val loudest = alive.maxByOrNull { it.decibelLevel }
 
         _uiState.value = ChromaSoundUiState.Running(

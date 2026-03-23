@@ -44,8 +44,8 @@ class MainActivity : ComponentActivity() {
             }
 
             Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF050508)) {
-                val uiState   by viewModel.uiState.collectAsState()
-                val bandCount by viewModel.bandCount.collectAsState()
+                val uiState  by viewModel.uiState.collectAsState()
+                val settings by viewModel.settings.collectAsState()
 
                 val permissionLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission()
@@ -61,11 +61,11 @@ class MainActivity : ComponentActivity() {
                 }
 
                 ChromaSoundScreen(
-                    uiState           = uiState,
-                    bandCount         = bandCount,
-                    onStartRequested  = { viewModel.resumeCapture() },
-                    onStopRequested   = { viewModel.stopCapture() },
-                    onBandCountChange = { viewModel.setBandCount(it) }
+                    uiState          = uiState,
+                    settings         = settings,
+                    onStartRequested = { viewModel.resumeCapture() },
+                    onStopRequested  = { viewModel.stopCapture() },
+                    onSettingsChange = { viewModel.updateSettings(it) }
                 )
             }
         }
