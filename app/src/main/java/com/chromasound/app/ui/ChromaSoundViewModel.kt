@@ -93,7 +93,8 @@ class ChromaSoundViewModel : ViewModel() {
             placement      = new.placement.coerceIn(Settings.MIN_PLACEMENT, Settings.MAX_PLACEMENT),
             sensitivity    = new.sensitivity.coerceIn(Settings.MIN_SENSITIVITY, Settings.MAX_SENSITIVITY),
             subBands       = new.subBands.coerceIn(Settings.MIN_SUB_BANDS, Settings.MAX_SUB_BANDS)
-        )
+            // bandColors: no clamping needed, pass through directly
+        ).let { it.copy(bandColors = new.bandColors) }
         _settings.value = s
 
         if (s.bandCount != currentBands.count) {
@@ -177,7 +178,7 @@ class ChromaSoundViewModel : ViewModel() {
                 x               = x,
                 y               = y,
                 radiusPx        = dbToRadius(db, s.minRadiusPx, s.maxRadiusPx),
-                color           = FrequencyColorMapper.frequencyToColor(centreHz, s.colorScheme),
+                color           = FrequencyColorMapper.colorForBand(band, centreHz, s.colorScheme, s.bandColors),
                 spawnTimeMs     = nowMs,
                 lifetimeMs      = s.lifetimeMs,
                 centreHz        = centreHz,

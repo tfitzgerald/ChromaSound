@@ -22,19 +22,19 @@ enum class ObjectShape {
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 data class Settings(
-    val bandCount:      Int         = BandDefinition.DEFAULT_BANDS,
-    val lifetimeMs:     Long        = 500L,
-    val circlesPerBand: Int         = 1,
-    val minRadiusPx:    Float       = 10f,
-    val maxRadiusPx:    Float       = 160f,
-    val placement:      Float       = 0.3f,
-    val sensitivity:    Float       = 1.0f,
-    val colorScheme:    ColorScheme = ColorScheme.RAINBOW,
-    val objectShape:    ObjectShape = ObjectShape.CIRCLE,
-    // How many radial shading rings to draw inside each shape.
-    // 1 = solid colour, 2–12 = rings from centre outward, each tinted
-    // by the energy of that sub-band slice within the frequency band.
-    val subBands:       Int         = 4
+    val bandCount:      Int              = BandDefinition.DEFAULT_BANDS,
+    val lifetimeMs:     Long             = 500L,
+    val circlesPerBand: Int              = 1,
+    val minRadiusPx:    Float            = 10f,
+    val maxRadiusPx:    Float            = 160f,
+    val placement:      Float            = 0.3f,
+    val sensitivity:    Float            = 1.0f,
+    val colorScheme:    ColorScheme      = ColorScheme.RAINBOW,
+    val objectShape:    ObjectShape      = ObjectShape.CIRCLE,
+    val subBands:       Int              = 4,
+    // Per-band color overrides. Key = band index (0-based).
+    // If a band has no entry the automatic color scheme is used instead.
+    val bandColors:     Map<Int, Color>  = emptyMap()
 ) {
     companion object {
         const val MIN_LIFETIME_MS      = 100L

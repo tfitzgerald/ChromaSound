@@ -43,16 +43,23 @@ fun ChromaSoundScreen(
     onStopRequested:  () -> Unit,
     onSettingsChange: (Settings) -> Unit
 ) {
-    var showSettings by remember { mutableStateOf(false) }
+    var showSettings   by remember { mutableStateOf(false) }
+    var showBandColors by remember { mutableStateOf(false) }
 
-    if (showSettings) {
-        SettingsScreen(
+    when {
+        showBandColors -> BandColorScreen(
             currentSettings  = settings,
             onSettingsChange = onSettingsChange,
-            onClose          = { showSettings = false }
+            onClose          = { showBandColors = false }
+        )
+        showSettings -> SettingsScreen(
+            currentSettings  = settings,
+            onSettingsChange = onSettingsChange,
+            onClose          = { showSettings = false },
+            onOpenBandColors = { showSettings = false; showBandColors = true }
         )
     } else {
-        Box(
+        else -> Box(
             modifier = Modifier.fillMaxSize().background(BgColor),
             contentAlignment = Alignment.Center
         ) {

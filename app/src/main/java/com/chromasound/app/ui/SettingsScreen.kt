@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,9 +34,10 @@ private val UiSubtle = Color(0xFF5A5870)
 
 @Composable
 fun SettingsScreen(
-    currentSettings: Settings,
+    currentSettings:  Settings,
     onSettingsChange: (Settings) -> Unit,
-    onClose: () -> Unit
+    onClose:          () -> Unit,
+    onOpenBandColors: () -> Unit = {}
 ) {
     // Local state mirrors — UI stays snappy, ViewModel gets every change live
     var bandCount      by remember { mutableStateOf(currentSettings.bandCount.toFloat()) }
@@ -293,6 +295,46 @@ fun SettingsScreen(
                         onClick = { objectShape = ObjectShape.SPHERE; emit() })
                     Spacer(Modifier.weight(1f))
                 }
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+
+        // ── Band colours navigation ───────────────────────────────────────────
+        item {
+            val overrideCount = currentSettings.bandColors.size
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .background(BgCard, RoundedCornerShape(16.dp))
+                    .clickable { onOpenBandColors() }
+                    .padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("BAND COLOURS", color = UiSubtle, fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        if (overrideCount == 0) "Using colour scheme for all bands"
+                        else "$overrideCount band${if (overrideCount == 1) "" else "s"} with custom colour",
+                        color = UiText, fontSize = 11.sp, fontFamily = FontFamily.Monospace
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                // Mini colour previews of overridden bands
+                if (overrideCount > 0) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        currentSettings.bandColors.values.take(6).forEach { col ->
+                            Box(Modifier.size(18.dp).clip(CircleShape).background(col))
+                        }
+                        if (overrideCount > 6) {
+                            Text("+${overrideCount - 6}", color = UiSubtle,
+                                fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text("→", color = UiAccent, fontSize = 18.sp,
+                    fontFamily = FontFamily.Monospace)
             }
             Spacer(Modifier.height(24.dp))
         }
