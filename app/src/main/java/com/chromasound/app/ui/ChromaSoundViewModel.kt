@@ -67,24 +67,32 @@ class ChromaSoundViewModel : ViewModel() {
         }
 
         /**
-         * Compute X position for a circle.
+         * Compute the X position for a circle.
          *
-         * [placement] = 0.0 → X is exactly the band centre column (grid-locked).
-         * [placement] = 1.0 → X can land anywhere across the full screen width.
-         * Values in between linearly interpolate the jitter window.
-         *
-         * The jitter is seeded from [band] and [slot] so different slots in the
-         * same band scatter in different directions, and the scatter grows smoothly
-         * as the slider increases.
+         * placement = 0.0 → locked to band centre column, no scatter.
+         * placement = 1.0 → can land anywhere across the full screen width.
          */
-        fun computeX(band: Int, slot: Int, bandCount: Int, placement: Float): Float {
-            val centre    = (band + 0.5f) / bandCount
-            // Max possible offset from centre = half a band width × placement × extra spread
-            val halfBand  = 0.5f / bandCount
+        fun computeX(band: Int, bandCount: Int, placement: Float): Float {
+            val centre   = (band + 0.5f) / bandCount
+            val halfBand = 0.5f / bandCount
             val maxOffset = halfBand + placement * (0.5f - halfBand)
-            // Deterministic jitter per band+slot, but vary sign each call via Random
-            val jitter    = (Random.nextFloat() * 2f - 1f) * maxOffset * placement
+            val jitter   = (Random.nextFloat() * 2f - 1f) * maxOffset * placement
             return (centre + jitter).coerceIn(0.02f, 0.98f)
+        }
+
+        /**
+         * Compute the Y position for a circle.
+         *
+         * placement = 0.0 → all circles sit exactly on the horizontal centre line (Y = 0.5).
+         * placement = 1.0 → circles scatter freely across the full screen height.
+         *
+         * The scatter window grows linearly with placement, so the transition
+         * from a tight centre band to full-screen scatter is smooth and continuous.
+         */
+        fun computeY(placement: Float): Float {
+            val maxOffset = placement * 0.45f
+            val jitter    = (Random.nextFloat() * 2f - 1f) * maxOffset
+            return (0.5f + jitter).coerceIn(0.05f, 0.95f)
         }
     }
 
@@ -169,13 +177,10 @@ class ChromaSoundViewModel : ViewModel() {
                 bandSlots[band][slot]?.lifeFraction(nowMs) ?: -1f
             } ?: 0
 
-            // Y: spread slots vertically when circlesPerBand > 1
-            val slotOffset = if (s.circlesPerBand == 1) 0f
-                             else (targetSlot / (s.circlesPerBand - 1f) - 0.5f) * 0.3f
-            val y = (0.5f + slotOffset).coerceIn(0.1f, 0.9f)
-
-            // X: placement slider controls scatter width
-            val x = computeX(band, targetSlot, bd.count, s.placement)
+            // Both X and Y are driven by the placement slider.
+            // Y = 0.5 (centre line) when placement = 0, full scatter when placement = 1.
+            val y = computeY(s.placement)
+            val x = computeX(band, bd.count, s.placement)
 
             bandSlots[band][targetSlot] = FrequencyCircle(
                 bandIndex    = band,
