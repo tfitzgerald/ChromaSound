@@ -37,7 +37,8 @@ fun SettingsScreen(
     currentSettings:  Settings,
     onSettingsChange: (Settings) -> Unit,
     onClose:          () -> Unit,
-    onOpenBandColors: () -> Unit = {}
+    onOpenBandColors: () -> Unit = {},
+    onOpenHelp:       () -> Unit = {}
 ) {
     // Local state mirrors — UI stays snappy, ViewModel gets every change live
     var bandCount      by remember { mutableStateOf(currentSettings.bandCount.toFloat()) }
@@ -99,7 +100,16 @@ fun SettingsScreen(
                 Text("SETTINGS", color = UiText, fontSize = 18.sp,
                     fontWeight = FontWeight.ExtraBold, fontFamily = FontFamily.Monospace, letterSpacing = 4.sp)
                 Spacer(Modifier.weight(1f))
-                Spacer(Modifier.width(80.dp))
+                OutlinedButton(
+                    onClick = onOpenHelp,
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = UiAccent),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, UiAccent.copy(alpha = 0.5f)),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Text("?  HELP", fontFamily = FontFamily.Monospace, fontSize = 11.sp,
+                        letterSpacing = 2.sp, color = UiAccent)
+                }
             }
             Spacer(Modifier.height(28.dp))
         }
