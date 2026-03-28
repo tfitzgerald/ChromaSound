@@ -1,6 +1,11 @@
 package com.chromasound.app.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.util.Base64
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,7 +21,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -165,6 +172,70 @@ fun savePresets(context: Context, presets: List<NamedPreset>) {
         apply()
     }
 }
+
+// ── Preset code encode / decode ───────────────────────────────────────────────
+// Format: "CS1|name|bandCount|lifetimeMs|circlesPerBand|minR|maxR|placement|
+//          sensitivity|colorScheme|objectShape|subBands|noiseGate|mirror|trail|
+//          beatSens|colorAnim|waveform"
+// All packed into a base64 string prefixed with "CS:" for easy identification.
+
+private const val CODE_PREFIX  = "CS:"
+private const val CODE_VERSION = "1"
+
+fun encodePreset(p: NamedPreset): String {
+    val raw = listOf(
+        CODE_VERSION,
+        p.name.replace("|", "_"),
+        p.bandCount.toString(),
+        p.lifetimeMs.toString(),
+        p.circlesPerBand.toString(),
+        p.minRadiusPx.toString(),
+        p.maxRadiusPx.toString(),
+        p.placement.toString(),
+        p.sensitivity.toString(),
+        p.colorScheme.name,
+        p.objectShape.name,
+        p.subBands.toString(),
+        p.noiseGateDb.toString(),
+        p.mirrorMode.name,
+        p.trailLength.toString(),
+        p.beatSensitivity.toString(),
+        p.colorAnimSpeed.toString(),
+        if (p.showWaveform) "1" else "0"
+    ).joinToString("|")
+    return CODE_PREFIX + Base64.encodeToString(raw.toByteArray(), Base64.NO_WRAP)
+}
+
+fun decodePreset(code: String): NamedPreset? {
+    return try {
+        val trimmed = code.trim()
+        if (!trimmed.startsWith(CODE_PREFIX)) return null
+        val raw = String(Base64.decode(trimmed.removePrefix(CODE_PREFIX), Base64.NO_WRAP))
+        val parts = raw.split("|")
+        if (parts.size < 18) return null
+        // parts[0] = version, currently "1"
+        NamedPreset(
+            name            = parts[1],
+            bandCount       = parts[2].toInt(),
+            lifetimeMs      = parts[3].toLong(),
+            circlesPerBand  = parts[4].toInt(),
+            minRadiusPx     = parts[5].toFloat(),
+            maxRadiusPx     = parts[6].toFloat(),
+            placement       = parts[7].toFloat(),
+            sensitivity     = parts[8].toFloat(),
+            colorScheme     = ColorScheme.valueOf(parts[9]),
+            objectShape     = ObjectShape.valueOf(parts[10]),
+            subBands        = parts[11].toInt(),
+            noiseGateDb     = parts[12].toFloat(),
+            mirrorMode      = MirrorMode.valueOf(parts[13]),
+            trailLength     = parts[14].toInt(),
+            beatSensitivity = parts[15].toFloat(),
+            colorAnimSpeed  = parts[16].toFloat(),
+            showWaveform    = parts[17] == "1"
+        )
+    } catch (_: Exception) { null }
+}
+
 
 // ── Built-in colour themes ────────────────────────────────────────────────────
 

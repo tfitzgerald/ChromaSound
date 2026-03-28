@@ -778,6 +778,8 @@ private fun TopHud(
                 fontFamily = FontFamily.Monospace, letterSpacing = 2.sp)
             Spacer(Modifier.height(4.dp))
             VolumeBar(rmsVolume, Modifier.width(80.dp).height(6.dp))
+            Spacer(Modifier.height(6.dp))
+            RmsHistoryGraph(rmsVolume, Modifier.width(80.dp).height(28.dp))
         }
         Column(horizontalAlignment = Alignment.End) {
             IconButton(onClick = onSettings,
@@ -788,6 +790,42 @@ private fun TopHud(
                 fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
             Text(peakDb, color = UiSubtle, fontSize = 10.sp,
                 fontFamily = FontFamily.Monospace)
+        }
+    }
+}
+
+// ── RMS history graph ────────────────────────────────────────────────────────
+// Scrolling bar chart of the last ~3 seconds of RMS volume.
+// Each audio frame (~93ms) appends one bar; we keep 32 bars total.
+@Composable
+private fun RmsHistoryGraph(rmsVolume: Float, modifier: Modifier = Modifier) {
+    val history = remember { ArrayDeque<Float>(32) }
+    // Append current volume each recomposition (each audio frame)
+    history.addLast(rmsVolume)
+    if (history.size > 32) history.removeFirst()
+
+    Canvas(modifier = modifier) {
+        val w     = size.width
+        val h     = size.height
+        val n     = history.size
+        val barW  = w / 32f
+        val gap   = barW * 0.25f
+        // Faint baseline
+        drawLine(Color.White.copy(alpha = 0.06f),
+            Offset(0f, h), Offset(w, h), strokeWidth = 1f)
+        // Bars — oldest on left, newest on right
+        history.forEachIndexed { i, rms ->
+            val x      = i * barW + gap / 2f
+            val barH   = (rms * h).coerceAtLeast(1.5f)
+            val alpha  = 0.4f + (i.toFloat() / 32f) * 0.6f  // fade older bars
+            val color  = when {
+                rms > 0.7f -> Color(0xFFFF6B6B).copy(alpha = alpha) // loud  = red
+                rms > 0.3f -> Color(0xFF7C6FFF).copy(alpha = alpha) // mid   = purple
+                else       -> Color(0xFF42E5F5).copy(alpha = alpha) // quiet = cyan
+            }
+            drawRect(color = color,
+                topLeft    = Offset(x, h - barH),
+                size       = androidx.compose.ui.geometry.Size(barW - gap, barH))
         }
     }
 }
