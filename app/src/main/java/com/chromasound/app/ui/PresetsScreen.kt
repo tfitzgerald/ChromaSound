@@ -311,17 +311,15 @@ fun PresetsScreen(
 
         // ── Saved preset cards ────────────────────────────────────────────────
         itemsIndexed(presets) { index, preset ->
-            item {
-                PresetCard(
-                    preset = preset,
-                    onLoad = {
-                        onApplySettings(preset.toSettings(currentSettings))
-                        onClose()
-                    },
-                    onDelete = { showDeleteConfirm = index }
-                )
-                Spacer(Modifier.height(10.dp))
-            }
+            PresetCard(
+                preset = preset,
+                onLoad = {
+                    onApplySettings(preset.toSettings(currentSettings))
+                    onClose()
+                },
+                onDelete = { showDeleteConfirm = index }
+            )
+            Spacer(Modifier.height(10.dp))
         }
 
         item { Spacer(Modifier.height(40.dp)) }
