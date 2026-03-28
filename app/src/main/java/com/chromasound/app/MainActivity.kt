@@ -28,17 +28,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // ── All window configuration runs ONCE here in onCreate ───────────────
-        // Never touch the window inside a Compose SideEffect — it fires on every
-        // recomposition (30–60 times/sec during audio capture) and causes flicker.
-
-        // Keep screen on for the lifetime of this activity
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
-        // Edge-to-edge display — let content draw behind status/nav bars
         WindowCompat.setDecorFitsSystemWindows(window, false)
-
-        // Transparent status and navigation bars with dark icons off (light content)
         window.statusBarColor     = android.graphics.Color.TRANSPARENT
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
         WindowInsetsControllerCompat(window, window.decorView).apply {
@@ -48,8 +39,12 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF050508)) {
-                val uiState  by viewModel.uiState.collectAsState()
-                val settings by viewModel.settings.collectAsState()
+                val uiState         by viewModel.uiState.collectAsState()
+                val settings        by viewModel.settings.collectAsState()
+                // Collected separately so each new FloatArray reference triggers
+                // recomposition — FloatArray inside a data class uses reference
+                // equality so embedding it in UiState caused the waveform to freeze.
+                val waveformSamples by viewModel.waveformSamples.collectAsState()
 
                 val permissionLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission()
@@ -67,6 +62,7 @@ class MainActivity : ComponentActivity() {
                 ChromaSoundScreen(
                     uiState          = uiState,
                     settings         = settings,
+                    waveformSamples  = waveformSamples,
                     onStartRequested = { viewModel.resumeCapture() },
                     onStopRequested  = { viewModel.stopCapture() },
                     onSettingsChange = { viewModel.updateSettings(it) }

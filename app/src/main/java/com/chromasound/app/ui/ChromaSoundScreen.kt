@@ -41,6 +41,7 @@ private val UiSubtle = Color(0xFF5A5870)
 fun ChromaSoundScreen(
     uiState:          ChromaSoundUiState,
     settings:         Settings,
+    waveformSamples:  FloatArray,
     onStartRequested: () -> Unit,
     onStopRequested:  () -> Unit,
     onSettingsChange: (Settings) -> Unit
@@ -85,6 +86,7 @@ fun ChromaSoundScreen(
                         trailLength     = settings.trailLength,
                         colorAnimSpeed  = settings.colorAnimSpeed,
                         showWaveform    = settings.showWaveform,
+                        waveformSamples = waveformSamples,
                         onStop          = onStopRequested,
                         onSettings      = { showSettings = true }
                     )
@@ -139,14 +141,15 @@ private fun IdleScreen(onStart: () -> Unit) {
 // ── Running ───────────────────────────────────────────────────────────────────
 @Composable
 private fun RunningScreen(
-    state:          ChromaSoundUiState.Running,
-    objectShape:    ObjectShape,
-    mirrorMode:     MirrorMode,
-    trailLength:    Int,
-    colorAnimSpeed: Float,
-    showWaveform:   Boolean,
-    onStop:         () -> Unit,
-    onSettings:     () -> Unit
+    state:           ChromaSoundUiState.Running,
+    objectShape:     ObjectShape,
+    mirrorMode:      MirrorMode,
+    trailLength:     Int,
+    colorAnimSpeed:  Float,
+    showWaveform:    Boolean,
+    waveformSamples: FloatArray,
+    onStop:          () -> Unit,
+    onSettings:      () -> Unit
 ) {
     Box(Modifier.fillMaxSize()) {
         VisualizerCanvas(
@@ -158,7 +161,7 @@ private fun RunningScreen(
             beatPulseMs     = state.beatPulseMs,
             colorAnimSpeed  = colorAnimSpeed,
             showWaveform    = showWaveform,
-            waveformSamples = state.waveformSamples,
+            waveformSamples = waveformSamples,
             modifier        = Modifier.fillMaxSize()
         )
         TopHud(

@@ -38,8 +38,7 @@ sealed interface ChromaSoundUiState {
         val peakHz:         String = "",
         val peakDb:         String = "",
         val bpm:            Float  = 0f,
-        val beatPulseMs:    Long   = 0L,
-        val waveformSamples: FloatArray = FloatArray(0)
+        val beatPulseMs:    Long   = 0L
     ) : ChromaSoundUiState
 }
 
@@ -55,6 +54,12 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
 
     private val _uiState = MutableStateFlow<ChromaSoundUiState>(ChromaSoundUiState.Idle)
     val uiState: StateFlow<ChromaSoundUiState> = _uiState.asStateFlow()
+
+    // Waveform kept separate from UiState — FloatArray inside a data class uses
+    // reference equality so Compose never sees content changes. A dedicated StateFlow
+    // wrapping a new FloatArray reference each frame forces recomposition correctly.
+    private val _waveformSamples = MutableStateFlow(FloatArray(0))
+    val waveformSamples: StateFlow<FloatArray> = _waveformSamples.asStateFlow()
 
     private val _settings = MutableStateFlow(Settings())
     val settings: StateFlow<Settings> = _settings.asStateFlow()
@@ -280,6 +285,10 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
         val alive       = bandSlots.flatMap { it.filterNotNull() }
         val loudest     = alive.maxByOrNull { it.decibelLevel }
 
+        // Update waveform in its own StateFlow — new FloatArray reference each frame
+        // guarantees Compose detects the change regardless of content equality
+        _waveformSamples.value = frame.waveformSamples
+
         _uiState.value = ChromaSoundUiState.Running(
             circles         = alive,
             rmsVolume       = frame.rmsVolume,
@@ -287,11 +296,9 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
             bandCount       = bd.count,
             peakHz          = loudest?.let { formatHz(it.centreHz) } ?: "—",
             peakDb          = loudest?.let { "${"%.1f".format(it.decibelLevel)} dB" } ?: "—",
-            // Keep last known BPM — only update when engine reports a new non-zero value
             bpm             = if (frame.bpm > 0f) frame.bpm else prevState?.bpm ?: 0f,
             beatPulseMs     = if (frame.isBeat) System.currentTimeMillis()
-                              else prevState?.beatPulseMs ?: 0L,
-            waveformSamples = frame.waveformSamples
+                              else prevState?.beatPulseMs ?: 0L
         )
     }
 }
