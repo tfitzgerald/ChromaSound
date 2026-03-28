@@ -395,11 +395,11 @@ private fun VisualizerCanvas(
     // ── Starfield state ───────────────────────────────────────────────────
     data class Star(var x: Float, var y: Float, val speed: Float, val size: Float)
     val stars = remember {
-        List(80) { Star(
+        List(120) { Star(
             x     = kotlin.random.Random.nextFloat(),
             y     = kotlin.random.Random.nextFloat(),
-            speed = 0.00008f + kotlin.random.Random.nextFloat() * 0.00015f,
-            size  = 0.8f + kotlin.random.Random.nextFloat() * 1.6f
+            speed = 0.0003f + kotlin.random.Random.nextFloat() * 0.0008f,
+            size  = 3f + kotlin.random.Random.nextFloat() * 5f   // 3–8px, clearly visible
         ) }
     }
 
@@ -471,29 +471,27 @@ private fun VisualizerCanvas(
             // which requires a dark background to glow correctly.
             BackgroundEffect.BLOOM -> {
                 drawRect(color = Color(0xFF050508))
-                // Boost RMS heavily — raw values 0.002–0.05 need strong amplification
-                // Use a power curve so quiet sounds still show some bloom
-                val rmsAmp = (capturedRms * 30f).coerceIn(0f, 1f)
-                val bloom  = rmsAmp.let { it * it }.coerceIn(0f, 1f)  // power curve
+                val rmsAmp   = (capturedRms * 40f).coerceIn(0f, 1f)
+                val reactive = rmsAmp * rmsAmp
 
-                // Layer 1: wide soft glow covering the whole screen
+                // Wide atmospheric wash — always visible, clearly tints the background
                 drawRect(brush = Brush.radialGradient(
                     listOf(
-                        Color(0xFF7C6FFF).copy(alpha = bloom * 0.55f),
-                        Color(0xFF2A1F8F).copy(alpha = bloom * 0.25f),
+                        Color(0xFF7C6FFF).copy(alpha = 0.22f + reactive * 0.40f),
+                        Color(0xFF3A1F9F).copy(alpha = 0.12f + reactive * 0.20f),
                         Color.Transparent
                     ),
                     center = Offset(w * 0.5f, h * 0.5f),
-                    radius = maxOf(w, h) * 0.9f
+                    radius = maxOf(w, h) * 1.0f
                 ))
-                // Layer 2: bright hot centre that really punches on loud moments
+                // Bright centre pulse on loud beats
                 drawRect(brush = Brush.radialGradient(
                     listOf(
-                        Color(0xFFB8AAFF).copy(alpha = bloom * 0.45f),
+                        Color(0xFFD0C8FF).copy(alpha = 0.15f + reactive * 0.40f),
                         Color.Transparent
                     ),
                     center = Offset(w * 0.5f, h * 0.5f),
-                    radius = w * 0.35f
+                    radius = w * 0.45f
                 ))
             }
             BackgroundEffect.NOISE -> {
@@ -541,10 +539,19 @@ private fun VisualizerCanvas(
                 stars.forEach { star ->
                     star.y += star.speed
                     if (star.y > 1f) { star.y = 0f; star.x = kotlin.random.Random.nextFloat() }
+                    val cx = star.x * w
+                    val cy = star.y * h
+                    // Soft glow halo behind each star
                     drawCircle(
-                        color  = Color.White.copy(alpha = 0.25f + star.size * 0.15f),
+                        color  = Color.White.copy(alpha = 0.12f),
+                        radius = star.size * 2.5f,
+                        center = Offset(cx, cy)
+                    )
+                    // Bright core
+                    drawCircle(
+                        color  = Color.White.copy(alpha = 0.75f + star.size * 0.03f),
                         radius = star.size,
-                        center = Offset(star.x * w, star.y * h)
+                        center = Offset(cx, cy)
                     )
                 }
             }
