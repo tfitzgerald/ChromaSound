@@ -47,12 +47,17 @@ fun ChromaSoundScreen(
     onSettingsChange:      (Settings) -> Unit,
     onScreenshotRequested: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    var showOnboarding by remember { mutableStateOf(!hasSeenOnboarding(context)) }
     var showSettings   by remember { mutableStateOf(false) }
     var showBandColors by remember { mutableStateOf(false) }
     var showHelp       by remember { mutableStateOf(false) }
     var showPresets    by remember { mutableStateOf(false) }
 
     when {
+        showOnboarding -> OnboardingScreen(
+            onDone = { showOnboarding = false }
+        )
         showHelp -> HelpScreen(
             onClose = { showHelp = false }
         )
