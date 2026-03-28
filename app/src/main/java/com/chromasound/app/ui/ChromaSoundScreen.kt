@@ -471,23 +471,25 @@ private fun VisualizerCanvas(
             // which requires a dark background to glow correctly.
             BackgroundEffect.BLOOM -> {
                 drawRect(color = Color(0xFF050508))
-                val rmsAmp   = (capturedRms * 40f).coerceIn(0f, 1f)
-                val reactive = rmsAmp * rmsAmp
+                // Multiplier of 12 maps real mic RMS range (0.001–0.08) across
+                // the full 0–1 bloom range. The previous ×40 caused saturation
+                // above rms=0.025 so the bloom never visibly changed with dynamics.
+                val rmsAmp = (capturedRms * 12f).coerceIn(0f, 1f)
 
-                // Wide atmospheric wash — always visible, clearly tints the background
+                // Wide atmospheric wash — base tint always visible, pulses with volume
                 drawRect(brush = Brush.radialGradient(
                     listOf(
-                        Color(0xFF7C6FFF).copy(alpha = 0.22f + reactive * 0.40f),
-                        Color(0xFF3A1F9F).copy(alpha = 0.12f + reactive * 0.20f),
+                        Color(0xFF7C6FFF).copy(alpha = 0.10f + rmsAmp * 0.50f),
+                        Color(0xFF3A1F9F).copy(alpha = 0.05f + rmsAmp * 0.22f),
                         Color.Transparent
                     ),
                     center = Offset(w * 0.5f, h * 0.5f),
                     radius = maxOf(w, h) * 1.0f
                 ))
-                // Bright centre pulse on loud beats
+                // Bright centre — clearly reacts to each beat
                 drawRect(brush = Brush.radialGradient(
                     listOf(
-                        Color(0xFFD0C8FF).copy(alpha = 0.15f + reactive * 0.40f),
+                        Color(0xFFD0C8FF).copy(alpha = 0.05f + rmsAmp * 0.45f),
                         Color.Transparent
                     ),
                     center = Offset(w * 0.5f, h * 0.5f),
