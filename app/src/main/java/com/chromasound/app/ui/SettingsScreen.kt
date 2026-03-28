@@ -38,7 +38,8 @@ fun SettingsScreen(
     onSettingsChange: (Settings) -> Unit,
     onClose:          () -> Unit,
     onOpenBandColors: () -> Unit = {},
-    onOpenHelp:       () -> Unit = {}
+    onOpenHelp:       () -> Unit = {},
+    onOpenPresets:    () -> Unit = {}
 ) {
     // Local state mirrors — UI stays snappy, ViewModel gets every change live
     var bandCount      by remember { mutableStateOf(currentSettings.bandCount.toFloat()) }
@@ -325,6 +326,30 @@ fun SettingsScreen(
                 }
             }
             Spacer(Modifier.height(24.dp))
+        }
+
+        // ── Presets navigation ────────────────────────────────────────────────
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .background(BgCard, RoundedCornerShape(16.dp))
+                    .clickable { onOpenPresets() }
+                    .padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("PRESETS", color = UiSubtle, fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+                    Spacer(Modifier.height(3.dp))
+                    Text("Save, load and apply colour themes",
+                        color = UiText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                }
+                Text("🎛", fontSize = 20.sp)
+                Spacer(Modifier.width(8.dp))
+                Text("→", color = UiAccent, fontSize = 18.sp,
+                    fontFamily = FontFamily.Monospace)
+            }
+            Spacer(Modifier.height(14.dp))
         }
 
         // ── Band colours navigation ───────────────────────────────────────────

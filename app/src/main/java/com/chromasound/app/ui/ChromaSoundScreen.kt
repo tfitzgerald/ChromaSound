@@ -46,6 +46,7 @@ fun ChromaSoundScreen(
     var showSettings   by remember { mutableStateOf(false) }
     var showBandColors by remember { mutableStateOf(false) }
     var showHelp       by remember { mutableStateOf(false) }
+    var showPresets    by remember { mutableStateOf(false) }
 
     when {
         showHelp -> HelpScreen(
@@ -56,12 +57,18 @@ fun ChromaSoundScreen(
             onSettingsChange = onSettingsChange,
             onClose          = { showBandColors = false }
         )
+        showPresets -> PresetsScreen(
+            currentSettings  = settings,
+            onApplySettings  = { onSettingsChange(it) },
+            onClose          = { showPresets = false }
+        )
         showSettings -> SettingsScreen(
             currentSettings  = settings,
             onSettingsChange = onSettingsChange,
             onClose          = { showSettings = false },
             onOpenBandColors = { showSettings = false; showBandColors = true },
-            onOpenHelp       = { showSettings = false; showHelp = true }
+            onOpenHelp       = { showSettings = false; showHelp = true },
+            onOpenPresets    = { showSettings = false; showPresets = true }
         )
         else -> Box(
             modifier = Modifier.fillMaxSize().background(BgColor),
