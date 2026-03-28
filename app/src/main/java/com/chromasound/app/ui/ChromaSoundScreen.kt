@@ -458,9 +458,10 @@ private fun VisualizerCanvas(
         // ── 0. Background ─────────────────────────────────────────────────
         when (backgroundEffect) {
             BackgroundEffect.BLOOM -> {
-                val bloom = (rmsVolume * 8f).coerceIn(0f, 1f) * 0.06f
                 val bgC = if (isDark) Color(0xFF050508) else Color(0xFFF5F5FA)
                 drawRect(color = bgC)
+                // Amplify RMS heavily — raw values are 0.002–0.05 so we need 20x to see anything
+                val bloom = (rmsVolume * 20f).coerceIn(0f, 1f) * 0.18f
                 drawRect(brush = Brush.radialGradient(
                     listOf(Color(0xFF7C6FFF).copy(alpha = bloom), Color.Transparent),
                     center = Offset(w * 0.5f, h * 0.5f),
@@ -470,29 +471,36 @@ private fun VisualizerCanvas(
             BackgroundEffect.NOISE -> {
                 val bgC = if (isDark) Color(0xFF050508) else Color(0xFFF5F5FA)
                 drawRect(color = bgC)
-                // Chromatic noise — random tiny dots at very low opacity
-                val rng = kotlin.random.Random(nowMs / 33L) // change ~30fps
-                repeat(200) {
+                // Chromatic noise — animated grain giving the display depth
+                // Use nowMs bucketed to ~30fps so grain animates visibly
+                val rng = kotlin.random.Random(nowMs / 33L)
+                repeat(400) {
                     val nx = rng.nextFloat() * w
                     val ny = rng.nextFloat() * h
                     val nc = Color(
                         red   = rng.nextFloat(),
                         green = rng.nextFloat(),
                         blue  = rng.nextFloat(),
-                        alpha = 0.03f + rng.nextFloat() * 0.04f
+                        alpha = 0.08f + rng.nextFloat() * 0.12f  // 0.08–0.20, clearly visible
                     )
-                    drawCircle(color = nc, radius = rng.nextFloat() * 1.5f + 0.5f,
-                        center = Offset(nx, ny))
+                    // Larger dots: 1.5–4px radius so they're actually visible on screen
+                    drawCircle(
+                        color  = nc,
+                        radius = 1.5f + rng.nextFloat() * 2.5f,
+                        center = Offset(nx, ny)
+                    )
                 }
             }
             BackgroundEffect.STARFIELD -> {
                 val bgC = if (isDark) Color(0xFF050508) else Color(0xFFF5F5FA)
                 drawRect(color = bgC)
+                // Star colour adapts to theme: white on dark, dark purple on light
+                val starColor = if (isDark) Color.White else Color(0xFF5B4ECC)
                 stars.forEach { star ->
-                    star.y += star.speed  // drift downward
+                    star.y += star.speed
                     if (star.y > 1f) { star.y = 0f; star.x = kotlin.random.Random.nextFloat() }
                     drawCircle(
-                        color  = Color.White.copy(alpha = 0.12f + star.size * 0.08f),
+                        color  = starColor.copy(alpha = 0.25f + star.size * 0.15f),
                         radius = star.size,
                         center = Offset(star.x * w, star.y * h)
                     )

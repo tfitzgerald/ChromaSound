@@ -324,7 +324,7 @@ private fun SettingsHubScreen(
 
         // ── Version footer ────────────────────────────────────────────────────────
         item {
-            Text("ChromaSound  ·  Version 2.2.0",
+            Text("ChromaSound  ·  Version 2.2.2",
                 color = UiSubtle.copy(alpha = 0.6f), fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
@@ -835,11 +835,11 @@ private fun EffectsScreen(
             Spacer(Modifier.height(14.dp))
             SettingCard("PARTICLE THRESHOLD",
                 "How loud above band average triggers a burst",
-                value = "${"%.0f".format(particleThreshold * 100)}%%", unit = "sensitivity") {
+                value = "${"%.0f".format(particleThreshold * 100)}%", unit = "sensitivity") {
                 Slider(value = particleThreshold, onValueChange = onParticleThresh,
                     valueRange = Settings.MIN_PARTICLE_THRESHOLD..Settings.MAX_PARTICLE_THRESHOLD,
                     colors = sliderColors, modifier = Modifier.fillMaxWidth())
-                SliderLabels("10%%  very sensitive", "100%%  loud only")
+                SliderLabels("10%  very sensitive", "100%  loud only")
             }
         }
         Spacer(Modifier.height(14.dp))
