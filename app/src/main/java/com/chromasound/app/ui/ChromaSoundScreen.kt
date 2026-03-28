@@ -19,12 +19,14 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chromasound.app.model.FrequencyCircle
+import com.chromasound.app.model.MirrorMode
 import com.chromasound.app.model.ObjectShape
 import com.chromasound.app.model.Settings
 import kotlin.math.*
@@ -76,8 +78,14 @@ fun ChromaSoundScreen(
         ) {
             when (uiState) {
                 is ChromaSoundUiState.Running ->
-                    RunningScreen(uiState, objectShape = settings.objectShape,
-                        onStop = onStopRequested, onSettings = { showSettings = true })
+                    RunningScreen(
+                        state       = uiState,
+                        objectShape = settings.objectShape,
+                        mirrorMode  = settings.mirrorMode,
+                        trailLength = settings.trailLength,
+                        onStop      = onStopRequested,
+                        onSettings  = { showSettings = true }
+                    )
                 ChromaSoundUiState.PermissionDenied -> PermissionDeniedScreen()
                 else -> IdleScreen(onStartRequested)
             }
@@ -131,13 +139,20 @@ private fun IdleScreen(onStart: () -> Unit) {
 private fun RunningScreen(
     state:       ChromaSoundUiState.Running,
     objectShape: ObjectShape,
+    mirrorMode:  MirrorMode,
+    trailLength: Int,
     onStop:      () -> Unit,
     onSettings:  () -> Unit
 ) {
     Box(Modifier.fillMaxSize()) {
         BandLaneGrid(bandCount = state.bandCount, modifier = Modifier.fillMaxSize())
-        ShapeCanvas(circles = state.circles, shape = objectShape,
-            modifier = Modifier.fillMaxSize())
+        ShapeCanvas(
+            circles     = state.circles,
+            shape       = objectShape,
+            mirrorMode  = mirrorMode,
+            trailLength = trailLength,
+            modifier    = Modifier.fillMaxSize()
+        )
         TopHud(
             rmsVolume   = state.rmsVolume,
             activeCount = state.activeCount,
@@ -177,12 +192,23 @@ private fun BandLaneGrid(bandCount: Int, modifier: Modifier = Modifier) {
 // ── Shape canvas ──────────────────────────────────────────────────────────────
 @Composable
 private fun ShapeCanvas(
-    circles:  List<FrequencyCircle>,
-    shape:    ObjectShape,
-    modifier: Modifier = Modifier
+    circles:     List<FrequencyCircle>,
+    shape:       ObjectShape,
+    mirrorMode:  MirrorMode,
+    trailLength: Int,
+    modifier:    Modifier = Modifier
 ) {
     var nowMs    by remember { mutableStateOf(System.currentTimeMillis()) }
     var angleRad by remember { mutableStateOf(0f) }
+
+    // Trail history: a ring buffer of recent circle snapshots.
+    // Each entry is a full List<FrequencyCircle> captured at that frame.
+    // Index 0 = most recent past frame, MAX_TRAIL_LENGTH-1 = oldest.
+    val trailHistory = remember {
+        ArrayDeque<List<FrequencyCircle>>(Settings.MAX_TRAIL_LENGTH)
+    }
+    // Track the previous circles list so we only push when it changes
+    var prevCircles by remember { mutableStateOf<List<FrequencyCircle>>(emptyList()) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -193,10 +219,104 @@ private fun ShapeCanvas(
         }
     }
 
+    // Update trail history whenever circles list changes
+    if (circles !== prevCircles) {
+        if (trailLength > 0 && prevCircles.isNotEmpty()) {
+            trailHistory.addFirst(prevCircles)
+            while (trailHistory.size > Settings.MAX_TRAIL_LENGTH) {
+                trailHistory.removeLast()
+            }
+        }
+        prevCircles = circles
+    }
+
     Canvas(modifier = modifier) {
-        circles.forEach { circle ->
-            val life = circle.lifeFraction(nowMs)
-            if (life > 0f) drawShape(circle, life, shape, angleRad)
+        val w = size.width
+        val h = size.height
+
+        // Helper: draw all circles once, applying the given X/Y axis flips
+        fun drawAll(flipX: Boolean, flipY: Boolean) {
+            // Draw trail ghosts first (behind live shapes)
+            if (trailLength > 0) {
+                val visibleTrail = trailHistory.take(trailLength)
+                visibleTrail.forEachIndexed { ghostIndex, ghostCircles ->
+                    // ghostIndex 0 = most recent trail frame, most opaque
+                    val trailAlpha = (1f - (ghostIndex + 1f) / (trailLength + 1f)) * 0.55f
+                    ghostCircles.forEach { circle ->
+                        val life = circle.lifeFraction(nowMs)
+                        if (life > 0f) {
+                            val ghostCircle = if (flipX || flipY) {
+                                circle.copy(
+                                    x = if (flipX) 1f - circle.x else circle.x,
+                                    y = if (flipY) 1f - circle.y else circle.y
+                                )
+                            } else circle
+                            drawShape(ghostCircle, life * trailAlpha, shape, angleRad)
+                        }
+                    }
+                }
+            }
+
+            // Draw live shapes
+            circles.forEach { circle ->
+                val life = circle.lifeFraction(nowMs)
+                if (life > 0f) {
+                    val drawn = if (flipX || flipY) {
+                        circle.copy(
+                            x = if (flipX) 1f - circle.x else circle.x,
+                            y = if (flipY) 1f - circle.y else circle.y
+                        )
+                    } else circle
+                    drawShape(drawn, life, shape, angleRad)
+                }
+            }
+        }
+
+        // Apply mirror mode via canvas transforms
+        when (mirrorMode) {
+            MirrorMode.OFF -> {
+                drawAll(flipX = false, flipY = false)
+            }
+            MirrorMode.HORIZONTAL -> {
+                // Original left half
+                drawAll(flipX = false, flipY = false)
+                // Mirrored right half — scale X by -1 around canvas centre
+                withTransform({
+                    scale(scaleX = -1f, scaleY = 1f, pivot = Offset(w / 2f, h / 2f))
+                }) {
+                    drawAll(flipX = false, flipY = false)
+                }
+            }
+            MirrorMode.VERTICAL -> {
+                drawAll(flipX = false, flipY = false)
+                withTransform({
+                    scale(scaleX = 1f, scaleY = -1f, pivot = Offset(w / 2f, h / 2f))
+                }) {
+                    drawAll(flipX = false, flipY = false)
+                }
+            }
+            MirrorMode.QUAD -> {
+                // Top-left quadrant: restrict circles to left half, top half
+                drawAll(flipX = false, flipY = false)
+                // Top-right: mirror horizontally
+                withTransform({
+                    scale(scaleX = -1f, scaleY = 1f, pivot = Offset(w / 2f, h / 2f))
+                }) {
+                    drawAll(flipX = false, flipY = false)
+                }
+                // Bottom-left: mirror vertically
+                withTransform({
+                    scale(scaleX = 1f, scaleY = -1f, pivot = Offset(w / 2f, h / 2f))
+                }) {
+                    drawAll(flipX = false, flipY = false)
+                }
+                // Bottom-right: mirror both
+                withTransform({
+                    scale(scaleX = -1f, scaleY = -1f, pivot = Offset(w / 2f, h / 2f))
+                }) {
+                    drawAll(flipX = false, flipY = false)
+                }
+            }
         }
     }
 }

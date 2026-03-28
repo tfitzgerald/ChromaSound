@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chromasound.app.model.BandDefinition
 import com.chromasound.app.model.ColorScheme
+import com.chromasound.app.model.MirrorMode
 import com.chromasound.app.model.ObjectShape
 import com.chromasound.app.model.Settings
 import kotlin.math.roundToInt
@@ -53,6 +54,8 @@ fun SettingsScreen(
     var objectShape    by remember { mutableStateOf(currentSettings.objectShape) }
     var subBands       by remember { mutableStateOf(currentSettings.subBands.toFloat()) }
     var noiseGateDb    by remember { mutableStateOf(currentSettings.noiseGateDb) }
+    var mirrorMode     by remember { mutableStateOf(currentSettings.mirrorMode) }
+    var trailLength    by remember { mutableStateOf(currentSettings.trailLength.toFloat()) }
 
     fun emit() = onSettingsChange(Settings(
         bandCount      = bandCount.roundToInt(),
@@ -65,7 +68,9 @@ fun SettingsScreen(
         colorScheme    = colorScheme,
         objectShape    = objectShape,
         subBands       = subBands.roundToInt(),
-        noiseGateDb    = noiseGateDb
+        noiseGateDb    = noiseGateDb,
+        mirrorMode     = mirrorMode,
+        trailLength    = trailLength.roundToInt()
     ))
 
     val bands     = remember(bandCount.roundToInt()) { BandDefinition.build(bandCount.roundToInt()) }
@@ -326,6 +331,81 @@ fun SettingsScreen(
                 }
             }
             Spacer(Modifier.height(24.dp))
+        }
+
+        // ── Mirror mode ───────────────────────────────────────────────────────
+        item {
+            val modes = MirrorMode.entries.toList()
+            val modeLabels = mapOf(
+                MirrorMode.OFF        to "Off",
+                MirrorMode.HORIZONTAL to "H",
+                MirrorMode.VERTICAL   to "V",
+                MirrorMode.QUAD       to "Quad"
+            )
+            val modeEmoji = mapOf(
+                MirrorMode.OFF        to "▣",
+                MirrorMode.HORIZONTAL to "◫",
+                MirrorMode.VERTICAL   to "⬒",
+                MirrorMode.QUAD       to "⧈"
+            )
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .background(BgCard, RoundedCornerShape(16.dp))
+                    .padding(20.dp)
+            ) {
+                Text("MIRROR MODE", color = UiSubtle, fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+                Spacer(Modifier.height(4.dp))
+                Text("Reflect shapes across canvas axes",
+                    color = UiText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                Spacer(Modifier.height(14.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    modes.forEach { mode ->
+                        val selected = mirrorMode == mode
+                        Column(
+                            modifier = Modifier.weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (selected) UiAccent.copy(alpha = 0.18f) else Color.Transparent)
+                                .border(1.dp,
+                                    if (selected) UiAccent else UiSubtle.copy(alpha = 0.35f),
+                                    RoundedCornerShape(10.dp))
+                                .clickable { mirrorMode = mode; emit() }
+                                .padding(vertical = 10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(modeEmoji[mode] ?: "", fontSize = 18.sp)
+                            Spacer(Modifier.height(4.dp))
+                            Text(modeLabels[mode] ?: "",
+                                color = if (selected) UiAccent else UiSubtle,
+                                fontSize = 10.sp, fontFamily = FontFamily.Monospace,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+        }
+
+        // ── Trail length ──────────────────────────────────────────────────────
+        item {
+            val trailInt = trailLength.roundToInt()
+            SettingCard(
+                "SHAPE TRAILS",
+                "Ghost frames trailing behind each shape",
+                value = if (trailInt == 0) "Off" else "$trailInt",
+                unit  = if (trailInt == 0) "" else "frames"
+            ) {
+                Slider(
+                    value       = trailLength,
+                    onValueChange = { trailLength = it; emit() },
+                    valueRange  = Settings.MIN_TRAIL_LENGTH.toFloat()..Settings.MAX_TRAIL_LENGTH.toFloat(),
+                    steps       = Settings.MAX_TRAIL_LENGTH - 1,
+                    colors      = sliderColors,
+                    modifier    = Modifier.fillMaxWidth()
+                )
+                SliderLabels("Off", "${Settings.MAX_TRAIL_LENGTH} frames")
+            }
+            Spacer(Modifier.height(14.dp))
         }
 
         // ── Presets navigation ────────────────────────────────────────────────

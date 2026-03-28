@@ -19,6 +19,15 @@ enum class ObjectShape {
     SPHERE
 }
 
+// ── Mirror mode enum ──────────────────────────────────────────────────────────
+
+enum class MirrorMode {
+    OFF,        // normal — no mirroring
+    HORIZONTAL, // left ↔ right
+    VERTICAL,   // top ↔ bottom
+    QUAD        // all four quadrants
+}
+
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 data class Settings(
@@ -33,29 +42,32 @@ data class Settings(
     val objectShape:    ObjectShape      = ObjectShape.CIRCLE,
     val subBands:       Int              = 4,
     val bandColors:     Map<Int, Color>  = emptyMap(),
-    // Noise gate: minimum dBFS a band must reach to spawn a shape.
-    // Lower values = more sensitive (quiet sounds trigger shapes).
-    // Higher values = only louder sounds trigger shapes.
-    val noiseGateDb:    Float            = -50f
+    val noiseGateDb:    Float            = -50f,
+    // Mirror mode — reflects shapes across one or both axes
+    val mirrorMode:     MirrorMode       = MirrorMode.OFF,
+    // Trail length — number of ghost frames behind each shape (0 = off)
+    val trailLength:    Int              = 0
 ) {
     companion object {
-        const val MIN_LIFETIME_MS      = 100L
-        const val MAX_LIFETIME_MS      = 2000L
-        const val MIN_CIRCLES_PER_BAND = 1
-        const val MAX_CIRCLES_PER_BAND = 5
-        const val MIN_RADIUS_FLOOR     = 5f
-        const val MAX_RADIUS_FLOOR     = 120f
-        const val MIN_RADIUS_CEILING   = 20f
-        const val MAX_RADIUS_CEILING   = 250f
-        const val MIN_PLACEMENT        = 0f
-        const val MAX_PLACEMENT        = 1f
-        const val MIN_SENSITIVITY      = 0.1f
-        const val MAX_SENSITIVITY      = 3.0f
-        const val MIN_SUB_BANDS        = 1
-        const val MAX_SUB_BANDS        = 12
-        const val MIN_NOISE_GATE_DB    = -70f   // very sensitive
-        const val MAX_NOISE_GATE_DB    = -20f   // only loud sounds
+        const val MIN_LIFETIME_MS       = 100L
+        const val MAX_LIFETIME_MS       = 2000L
+        const val MIN_CIRCLES_PER_BAND  = 1
+        const val MAX_CIRCLES_PER_BAND  = 5
+        const val MIN_RADIUS_FLOOR      = 5f
+        const val MAX_RADIUS_FLOOR      = 120f
+        const val MIN_RADIUS_CEILING    = 20f
+        const val MAX_RADIUS_CEILING    = 250f
+        const val MIN_PLACEMENT         = 0f
+        const val MAX_PLACEMENT         = 1f
+        const val MIN_SENSITIVITY       = 0.1f
+        const val MAX_SENSITIVITY       = 3.0f
+        const val MIN_SUB_BANDS         = 1
+        const val MAX_SUB_BANDS         = 12
+        const val MIN_NOISE_GATE_DB     = -70f
+        const val MAX_NOISE_GATE_DB     = -20f
         const val DEFAULT_NOISE_GATE_DB = -50f
+        const val MIN_TRAIL_LENGTH      = 0
+        const val MAX_TRAIL_LENGTH      = 8
     }
 }
 

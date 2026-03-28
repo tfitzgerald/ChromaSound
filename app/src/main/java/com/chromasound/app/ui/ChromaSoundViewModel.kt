@@ -13,7 +13,7 @@ import com.chromasound.app.model.AudioFrame
 import com.chromasound.app.model.BandDefinition
 import com.chromasound.app.model.ColorScheme
 import com.chromasound.app.model.FrequencyCircle
-import com.chromasound.app.model.ObjectShape
+import com.chromasound.app.model.MirrorMode
 import com.chromasound.app.model.Settings
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -112,6 +112,8 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
             putString("objectShape",  s.objectShape.name)
             putInt("subBands",        s.subBands)
             putFloat("noiseGateDb",   s.noiseGateDb)
+            putString("mirrorMode",   s.mirrorMode.name)
+            putInt("trailLength",     s.trailLength)
             // Note: bandColors (Map<Int,Color>) are not persisted — they reset on restart.
             // Full persistence of custom band colours will be added in a future build.
             apply()
@@ -137,6 +139,10 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
                 } catch (_: Exception) { defaults.objectShape },
                 subBands       = prefs.getInt("subBands",       defaults.subBands),
                 noiseGateDb    = prefs.getFloat("noiseGateDb",  defaults.noiseGateDb),
+                mirrorMode     = try {
+                    MirrorMode.valueOf(prefs.getString("mirrorMode", defaults.mirrorMode.name) ?: defaults.mirrorMode.name)
+                } catch (_: Exception) { defaults.mirrorMode },
+                trailLength    = prefs.getInt("trailLength",    defaults.trailLength),
                 bandColors     = emptyMap()   // reset on every launch
             )
         } catch (_: Exception) {
@@ -157,7 +163,8 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
             placement      = new.placement.coerceIn(Settings.MIN_PLACEMENT, Settings.MAX_PLACEMENT),
             sensitivity    = new.sensitivity.coerceIn(Settings.MIN_SENSITIVITY, Settings.MAX_SENSITIVITY),
             subBands       = new.subBands.coerceIn(Settings.MIN_SUB_BANDS, Settings.MAX_SUB_BANDS),
-            noiseGateDb    = new.noiseGateDb.coerceIn(Settings.MIN_NOISE_GATE_DB, Settings.MAX_NOISE_GATE_DB)
+            noiseGateDb    = new.noiseGateDb.coerceIn(Settings.MIN_NOISE_GATE_DB, Settings.MAX_NOISE_GATE_DB),
+            trailLength    = new.trailLength.coerceIn(Settings.MIN_TRAIL_LENGTH, Settings.MAX_TRAIL_LENGTH)
         ).let { it.copy(bandColors = new.bandColors) }
 
         _settings.value = s
