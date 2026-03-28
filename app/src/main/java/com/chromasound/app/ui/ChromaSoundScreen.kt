@@ -19,7 +19,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -242,87 +241,125 @@ private fun VisualizerCanvas(
             )
         }
 
-        // ── 3. Helper: draw all circles (trails + live) with optional flip ────
-        fun drawAll(flipX: Boolean, flipY: Boolean) {
-            // Draw trail ghosts first (behind live shapes)
+        // ── 3. Draw shapes with mirror mode ───────────────────────────────────
+        // Mirror mode works by computing reflected coordinates directly.
+        // NO canvas transforms are used — they caused full-canvas bleed-over.
+        // Instead, each shape is drawn at its original position PLUS additional
+        // copies at reflected positions, all within the same canvas pass.
+
+        fun drawCircleAtPos(circle: FrequencyCircle, life: Float, cx: Float, cy: Float) {
+            val reflected = circle.copy(
+                x = cx / w,
+                y = cy / h
+            )
+            drawShape(reflected, life, shape, angleRad)
+        }
+
+        fun drawWithTrailAt(circle: FrequencyCircle, cx: Float, cy: Float) {
+            val life = circle.lifeFraction(nowMs)
+            if (life <= 0f) return
+            // Trail ghosts
             if (trailLength > 0) {
                 val visibleTrail = trailHistory.take(trailLength)
                 visibleTrail.forEachIndexed { ghostIndex, ghostCircles ->
-                    // ghostIndex 0 = most recent trail frame, most opaque
                     val trailAlpha = (1f - (ghostIndex + 1f) / (trailLength + 1f)) * 0.55f
-                    ghostCircles.forEach { circle ->
-                        val life = circle.lifeFraction(nowMs)
-                        if (life > 0f) {
-                            val ghostCircle = if (flipX || flipY) {
-                                circle.copy(
-                                    x = if (flipX) 1f - circle.x else circle.x,
-                                    y = if (flipY) 1f - circle.y else circle.y
-                                )
-                            } else circle
-                            drawShape(ghostCircle, life * trailAlpha, shape, angleRad)
+                    ghostCircles.forEach { ghost ->
+                        val gLife = ghost.lifeFraction(nowMs)
+                        if (gLife > 0f && ghost.bandIndex == circle.bandIndex && ghost.slotIndex == circle.slotIndex) {
+                            drawCircleAtPos(ghost, gLife * trailAlpha, cx, cy)
                         }
                     }
                 }
             }
-
-            // Draw live shapes
-            circles.forEach { circle ->
-                val life = circle.lifeFraction(nowMs)
-                if (life > 0f) {
-                    val drawn = if (flipX || flipY) {
-                        circle.copy(
-                            x = if (flipX) 1f - circle.x else circle.x,
-                            y = if (flipY) 1f - circle.y else circle.y
-                        )
-                    } else circle
-                    drawShape(drawn, life, shape, angleRad)
-                }
-            }
+            drawCircleAtPos(circle, life, cx, cy)
         }
 
-        // Apply mirror mode via canvas transforms
-        when (mirrorMode) {
-            MirrorMode.OFF -> {
-                drawAll(flipX = false, flipY = false)
-            }
-            MirrorMode.HORIZONTAL -> {
-                // Original left half
-                drawAll(flipX = false, flipY = false)
-                // Mirrored right half — scale X by -1 around canvas centre
-                withTransform({
-                    scale(scaleX = -1f, scaleY = 1f, pivot = Offset(w / 2f, h / 2f))
-                }) {
-                    drawAll(flipX = false, flipY = false)
+        circles.forEach { circle ->
+            val life = circle.lifeFraction(nowMs)
+            if (life <= 0f) return@forEach
+
+            // Original position in pixels
+            val ox = circle.x * w
+            val oy = circle.y * h
+
+            // Mirror position = reflected across centre
+            val mx = w - ox
+            val my = h - oy
+
+            when (mirrorMode) {
+                MirrorMode.OFF -> {
+                    // Trails
+                    if (trailLength > 0) {
+                        trailHistory.take(trailLength).forEachIndexed { gi, ghosts ->
+                            val ta = (1f - (gi + 1f) / (trailLength + 1f)) * 0.55f
+                            ghosts.filter { it.bandIndex == circle.bandIndex && it.slotIndex == circle.slotIndex }
+                                .forEach { g ->
+                                    val gl = g.lifeFraction(nowMs)
+                                    if (gl > 0f) drawShape(g, gl * ta, shape, angleRad)
+                                }
+                        }
+                    }
+                    drawShape(circle, life, shape, angleRad)
                 }
-            }
-            MirrorMode.VERTICAL -> {
-                drawAll(flipX = false, flipY = false)
-                withTransform({
-                    scale(scaleX = 1f, scaleY = -1f, pivot = Offset(w / 2f, h / 2f))
-                }) {
-                    drawAll(flipX = false, flipY = false)
+                MirrorMode.HORIZONTAL -> {
+                    // Original + horizontally mirrored copy
+                    drawShape(circle, life, shape, angleRad)
+                    drawCircleAtPos(circle, life, mx, oy)
+                    if (trailLength > 0) {
+                        trailHistory.take(trailLength).forEachIndexed { gi, ghosts ->
+                            val ta = (1f - (gi + 1f) / (trailLength + 1f)) * 0.55f
+                            ghosts.filter { it.bandIndex == circle.bandIndex && it.slotIndex == circle.slotIndex }
+                                .forEach { g ->
+                                    val gl = g.lifeFraction(nowMs)
+                                    if (gl > 0f) {
+                                        drawShape(g, gl * ta, shape, angleRad)
+                                        drawCircleAtPos(g, gl * ta, w - g.x * w, g.y * h)
+                                    }
+                                }
+                        }
+                    }
                 }
-            }
-            MirrorMode.QUAD -> {
-                // Top-left quadrant: restrict circles to left half, top half
-                drawAll(flipX = false, flipY = false)
-                // Top-right: mirror horizontally
-                withTransform({
-                    scale(scaleX = -1f, scaleY = 1f, pivot = Offset(w / 2f, h / 2f))
-                }) {
-                    drawAll(flipX = false, flipY = false)
+                MirrorMode.VERTICAL -> {
+                    // Original + vertically mirrored copy
+                    drawShape(circle, life, shape, angleRad)
+                    drawCircleAtPos(circle, life, ox, my)
+                    if (trailLength > 0) {
+                        trailHistory.take(trailLength).forEachIndexed { gi, ghosts ->
+                            val ta = (1f - (gi + 1f) / (trailLength + 1f)) * 0.55f
+                            ghosts.filter { it.bandIndex == circle.bandIndex && it.slotIndex == circle.slotIndex }
+                                .forEach { g ->
+                                    val gl = g.lifeFraction(nowMs)
+                                    if (gl > 0f) {
+                                        drawShape(g, gl * ta, shape, angleRad)
+                                        drawCircleAtPos(g, gl * ta, g.x * w, h - g.y * h)
+                                    }
+                                }
+                        }
+                    }
                 }
-                // Bottom-left: mirror vertically
-                withTransform({
-                    scale(scaleX = 1f, scaleY = -1f, pivot = Offset(w / 2f, h / 2f))
-                }) {
-                    drawAll(flipX = false, flipY = false)
-                }
-                // Bottom-right: mirror both
-                withTransform({
-                    scale(scaleX = -1f, scaleY = -1f, pivot = Offset(w / 2f, h / 2f))
-                }) {
-                    drawAll(flipX = false, flipY = false)
+                MirrorMode.QUAD -> {
+                    // All four quadrant copies
+                    drawShape(circle, life, shape, angleRad)        // top-left
+                    drawCircleAtPos(circle, life, mx, oy)           // top-right
+                    drawCircleAtPos(circle, life, ox, my)           // bottom-left
+                    drawCircleAtPos(circle, life, mx, my)           // bottom-right
+                    if (trailLength > 0) {
+                        trailHistory.take(trailLength).forEachIndexed { gi, ghosts ->
+                            val ta = (1f - (gi + 1f) / (trailLength + 1f)) * 0.55f
+                            ghosts.filter { it.bandIndex == circle.bandIndex && it.slotIndex == circle.slotIndex }
+                                .forEach { g ->
+                                    val gl = g.lifeFraction(nowMs)
+                                    if (gl > 0f) {
+                                        val gox = g.x * w;  val goy = g.y * h
+                                        val gmx = w - gox;  val gmy = h - goy
+                                        drawShape(g, gl * ta, shape, angleRad)
+                                        drawCircleAtPos(g, gl * ta, gmx, goy)
+                                        drawCircleAtPos(g, gl * ta, gox, gmy)
+                                        drawCircleAtPos(g, gl * ta, gmx, gmy)
+                                    }
+                                }
+                        }
+                    }
                 }
             }
         }
