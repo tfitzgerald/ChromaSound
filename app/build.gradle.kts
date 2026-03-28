@@ -52,5 +52,6 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.material3:material3-window-size-class")
     implementation(libs.kotlinx.coroutines.android)
 }

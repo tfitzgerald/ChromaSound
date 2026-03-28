@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.chromasound.app.model.BandDefinition
 import com.chromasound.app.model.ColorScheme
 import com.chromasound.app.model.BackgroundEffect
+import com.chromasound.app.model.ThemeMode
 import com.chromasound.app.model.MirrorMode
 import com.chromasound.app.model.ObjectShape
 import com.chromasound.app.model.Settings
@@ -68,6 +69,7 @@ fun SettingsScreen(
     var particleThreshold by remember { mutableStateOf(currentSettings.particleThreshold) }
     var oscilloscopeMode  by remember { mutableStateOf(currentSettings.oscilloscopeMode) }
     var backgroundEffect  by remember { mutableStateOf(currentSettings.backgroundEffect) }
+    var themeMode         by remember { mutableStateOf(currentSettings.themeMode) }
 
     var openSection by remember { mutableStateOf(Section.NONE) }
 
@@ -91,7 +93,8 @@ fun SettingsScreen(
         particlesEnabled  = particlesEnabled,
         particleThreshold = particleThreshold,
         oscilloscopeMode  = oscilloscopeMode,
-        backgroundEffect  = backgroundEffect
+        backgroundEffect  = backgroundEffect,
+        themeMode         = themeMode
     ))
 
     val sliderColors = SliderDefaults.colors(
@@ -135,10 +138,12 @@ fun SettingsScreen(
             subBands      = subBands,
             colorScheme   = colorScheme,
             objectShape   = objectShape,
+            themeMode     = themeMode,
             sliderColors  = sliderColors,
             onSubBands    = { subBands = it; emit() },
             onColorScheme = { colorScheme = it; emit() },
             onObjectShape = { objectShape = it; emit() },
+            onThemeMode   = { themeMode = it; emit() },
             onBandColors  = onOpenBandColors,
             onBack        = { openSection = Section.NONE }
         )
@@ -319,7 +324,7 @@ private fun SettingsHubScreen(
 
         // ── Version footer ────────────────────────────────────────────────────────
         item {
-            Text("ChromaSound  ·  Version 2.1.2",
+            Text("ChromaSound  ·  Version 2.2.0",
                 color = UiSubtle.copy(alpha = 0.6f), fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
@@ -499,10 +504,12 @@ private fun VisualScreen(
     subBands:      Float,
     colorScheme:   ColorScheme,
     objectShape:   ObjectShape,
+    themeMode:     ThemeMode,
     sliderColors:  SliderColors,
     onSubBands:    (Float) -> Unit,
     onColorScheme: (ColorScheme) -> Unit,
     onObjectShape: (ObjectShape) -> Unit,
+    onThemeMode:   (ThemeMode) -> Unit,
     onBandColors:  () -> Unit,
     onBack:        () -> Unit
 ) {
@@ -583,6 +590,44 @@ private fun VisualScreen(
         }
         Spacer(Modifier.height(14.dp))
 
+        // Theme mode selector
+        Spacer(Modifier.height(14.dp))
+        Column(Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(16.dp)).padding(20.dp)) {
+            Text("DISPLAY THEME", color = UiSubtle, fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+            Spacer(Modifier.height(12.dp))
+            val themes = listOf(
+                ThemeMode.DARK   to "Dark",
+                ThemeMode.SYSTEM to "System",
+                ThemeMode.LIGHT  to "Light"
+            )
+            val themeEmoji = mapOf(
+                ThemeMode.DARK to "🌙", ThemeMode.SYSTEM to "⚙", ThemeMode.LIGHT to "☀️"
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                themes.forEach { (mode, label) ->
+                    val selected = themeMode == mode
+                    Column(
+                        modifier = Modifier.weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (selected) UiAccent.copy(alpha = 0.18f) else Color.Transparent)
+                            .border(1.dp, if (selected) UiAccent else UiSubtle.copy(alpha = 0.35f),
+                                RoundedCornerShape(10.dp))
+                            .clickable { onThemeMode(mode) }
+                            .padding(vertical = 10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(themeEmoji[mode] ?: "", fontSize = 16.sp,
+                            color = if (selected) UiAccent else UiSubtle)
+                        Spacer(Modifier.height(4.dp))
+                        Text(label, fontSize = 9.sp,
+                            color = if (selected) UiAccent else UiSubtle,
+                            fontFamily = FontFamily.Monospace)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
         // Band colours shortcut
         Row(
             modifier = Modifier.fillMaxWidth()

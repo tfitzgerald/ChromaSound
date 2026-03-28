@@ -16,6 +16,7 @@ import com.chromasound.app.fft.FrequencyColorMapper
 import com.chromasound.app.model.AudioFrame
 import com.chromasound.app.model.BackgroundEffect
 import com.chromasound.app.model.BandDefinition
+import com.chromasound.app.model.ThemeMode
 import com.chromasound.app.model.ColorScheme
 import com.chromasound.app.model.FrequencyCircle
 import com.chromasound.app.model.MirrorMode
@@ -143,6 +144,7 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
             putFloat("particleThreshold",    s.particleThreshold)
             putBoolean("oscilloscopeMode",   s.oscilloscopeMode)
             putString("backgroundEffect",    s.backgroundEffect.name)
+            putString("themeMode",           s.themeMode.name)
             apply()
         }
     }
@@ -179,6 +181,9 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
                 backgroundEffect   = try {
                     BackgroundEffect.valueOf(prefs.getString("backgroundEffect", defaults.backgroundEffect.name) ?: defaults.backgroundEffect.name)
                 } catch (_: Exception) { defaults.backgroundEffect },
+                themeMode          = try {
+                    ThemeMode.valueOf(prefs.getString("themeMode", defaults.themeMode.name) ?: defaults.themeMode.name)
+                } catch (_: Exception) { defaults.themeMode },
                 bandColors     = emptyMap()
             )
         } catch (_: Exception) {
@@ -209,6 +214,7 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
             particleThreshold  = new.particleThreshold.coerceIn(Settings.MIN_PARTICLE_THRESHOLD, Settings.MAX_PARTICLE_THRESHOLD),
             oscilloscopeMode   = new.oscilloscopeMode,
             backgroundEffect   = new.backgroundEffect,
+            themeMode          = new.themeMode,
             bandColors      = new.bandColors
         )
 

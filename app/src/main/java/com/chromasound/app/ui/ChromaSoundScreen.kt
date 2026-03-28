@@ -3,6 +3,7 @@ package com.chromasound.app.ui
 import androidx.compose.animation.core.*
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.Canvas
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -44,18 +45,22 @@ fun ChromaSoundScreen(
     uiState:               ChromaSoundUiState,
     settings:              Settings,
     waveformSamples:       List<Float>,
+    isDark:                Boolean = true,
+    isTablet:              Boolean = false,
     onStartRequested:      () -> Unit,
     onStopRequested:       () -> Unit,
     onSettingsChange:      (Settings) -> Unit,
     onScreenshotRequested: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val chromaColors = if (isDark) DarkChromaColors else LightChromaColors
     var showOnboarding by remember { mutableStateOf(!hasSeenOnboarding(context)) }
     var showSettings   by remember { mutableStateOf(false) }
     var showBandColors by remember { mutableStateOf(false) }
     var showHelp       by remember { mutableStateOf(false) }
     var showPresets    by remember { mutableStateOf(false) }
 
+    CompositionLocalProvider(LocalChromaTheme provides chromaColors) {
     when {
         showOnboarding -> OnboardingScreen(
             onDone = { showOnboarding = false }
@@ -99,6 +104,7 @@ fun ChromaSoundScreen(
                         particleThreshold = settings.particleThreshold,
                         oscilloscopeMode  = settings.oscilloscopeMode,
                         backgroundEffect  = settings.backgroundEffect,
+                        isTablet          = isTablet,
                         onStop            = onStopRequested,
                         onSettings        = { showSettings = true },
                         onScreenshot      = onScreenshotRequested
@@ -107,11 +113,13 @@ fun ChromaSoundScreen(
                 else -> IdleScreen(
                     onStart    = onStartRequested,
                     onSettings = { showSettings = true },
-                    onPresets  = { showPresets = true }
+                    onPresets  = { showPresets = true },
+                    isTablet   = isTablet
                 )
             }
         }
-    }
+    } // end when
+    } // end CompositionLocalProvider
 }
 
 // ── Idle ──────────────────────────────────────────────────────────────────────
@@ -119,7 +127,8 @@ fun ChromaSoundScreen(
 private fun IdleScreen(
     onStart:    () -> Unit,
     onSettings: () -> Unit = {},
-    onPresets:  () -> Unit = {}
+    onPresets:  () -> Unit = {},
+    isTablet:   Boolean    = false
 ) {
     val pulse = rememberInfiniteTransition(label = "pulse")
     val scale by pulse.animateFloat(
@@ -127,10 +136,11 @@ private fun IdleScreen(
         animationSpec = infiniteRepeatable(tween(1400, easing = EaseInOutSine), RepeatMode.Reverse),
         label = "s"
     )
+    val horizPad = if (isTablet) 64.dp else 32.dp
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier.padding(32.dp)
+        modifier = Modifier.fillMaxWidth(if (isTablet) 0.55f else 1f).padding(horizPad)
     ) {
         Box(
             Modifier.size((120 * scale).dp).background(
@@ -197,10 +207,98 @@ private fun RunningScreen(
     particleThreshold: Float,
     oscilloscopeMode:  Boolean,
     backgroundEffect:  BackgroundEffect,
+    isTablet:          Boolean = false,
     onStop:            () -> Unit,
     onSettings:        () -> Unit,
     onScreenshot:      () -> Unit
 ) {
+    val theme = LocalChromaTheme.current
+    if (isTablet) {
+        // Tablet: visualiser on the left, info panel on the right
+        Row(Modifier.fillMaxSize()) {
+            Box(Modifier.weight(1.4f).fillMaxHeight()) {
+                VisualizerCanvas(
+                    circles           = state.circles,
+                    bandCount         = state.bandCount,
+                    shape             = objectShape,
+                    mirrorMode        = mirrorMode,
+                    trailLength       = trailLength,
+                    beatPulseMs       = state.beatPulseMs,
+                    colorAnimSpeed    = colorAnimSpeed,
+                    showWaveform      = showWaveform,
+                    waveformSamples   = waveformSamples,
+                    particlesEnabled  = particlesEnabled,
+                    particleThreshold = particleThreshold,
+                    oscilloscopeMode  = oscilloscopeMode,
+                    backgroundEffect  = backgroundEffect,
+                    rmsVolume         = state.rmsVolume,
+                    isDark            = theme.isDark,
+                    modifier          = Modifier.fillMaxSize()
+                )
+                // Tablet HUD overlay
+                TopHud(
+                    rmsVolume   = state.rmsVolume,
+                    activeCount = state.activeCount,
+                    bandCount   = state.bandCount,
+                    peakHz      = state.peakHz,
+                    peakDb      = state.peakDb,
+                    bpm         = state.bpm,
+                    onSettings  = onSettings,
+                    modifier    = Modifier.fillMaxWidth().align(Alignment.TopCenter)
+                        .padding(top = 52.dp, start = 20.dp, end = 20.dp)
+                )
+            }
+            // Side info panel
+            Column(
+                modifier = Modifier
+                    .weight(0.6f)
+                    .fillMaxHeight()
+                    .background(theme.bgCard)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Spacer(Modifier.height(52.dp))
+                    Text("CHROMASOUND", color = theme.uiAccent, fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
+                        letterSpacing = 3.sp)
+                    Spacer(Modifier.height(16.dp))
+                    TabletStatRow("BANDS",   "${state.activeCount} / ${state.bandCount}", theme)
+                    TabletStatRow("PEAK",    state.peakHz, theme)
+                    TabletStatRow("LEVEL",   state.peakDb, theme)
+                    if (state.bpm > 0f)
+                        TabletStatRow("BPM", "${state.bpm.toInt()}", theme)
+                    Spacer(Modifier.height(20.dp))
+                    Text("VOL", color = theme.uiSubtle, fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace, letterSpacing = 2.sp)
+                    Spacer(Modifier.height(6.dp))
+                    VolumeBar(state.rmsVolume, Modifier.fillMaxWidth().height(8.dp))
+                    Spacer(Modifier.height(10.dp))
+                    RmsHistoryGraph(state.rmsVolume, Modifier.fillMaxWidth().height(60.dp))
+                }
+                Column {
+                    Button(onClick = onScreenshot,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = theme.uiAccent)
+                    ) { Text("📷  SCREENSHOT", fontFamily = FontFamily.Monospace, fontSize = 11.sp) }
+                    Spacer(Modifier.height(8.dp))
+                    Button(onClick = onSettings,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = theme.bgColor)
+                    ) { Text("⚙  SETTINGS", fontFamily = FontFamily.Monospace, fontSize = 11.sp,
+                        color = theme.uiSubtle) }
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(50),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = theme.uiText),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, theme.uiSubtle)
+                    ) { Text("■  STOP", fontFamily = FontFamily.Monospace, letterSpacing = 3.sp) }
+                    Spacer(Modifier.height(20.dp))
+                }
+            }
+        }
+    } else {
+    // Phone layout
     Box(Modifier.fillMaxSize()) {
         VisualizerCanvas(
             circles           = state.circles,
@@ -217,6 +315,7 @@ private fun RunningScreen(
             oscilloscopeMode  = oscilloscopeMode,
             backgroundEffect  = backgroundEffect,
             rmsVolume         = state.rmsVolume,
+                    isDark            = theme.isDark,
             modifier          = Modifier.fillMaxSize()
         )
         TopHud(
@@ -253,7 +352,8 @@ private fun RunningScreen(
                 Text("📷", fontSize = 16.sp)
             }
         }
-    }
+    } // end phone Box
+    } // end phone else
 }
 
 // ── Unified visualiser canvas ─────────────────────────────────────────────────
@@ -273,8 +373,10 @@ private fun VisualizerCanvas(
     oscilloscopeMode:  Boolean,
     backgroundEffect:  BackgroundEffect,
     rmsVolume:         Float,
+    isDark:            Boolean  = true,
     modifier:          Modifier = Modifier
 ) {
+    val theme = LocalChromaTheme.current
     var nowMs        by remember { mutableStateOf(System.currentTimeMillis()) }
     var angleRad     by remember { mutableStateOf(0f) }
     var hueOffsetDeg by remember { mutableStateOf(0f) }
@@ -357,7 +459,8 @@ private fun VisualizerCanvas(
         when (backgroundEffect) {
             BackgroundEffect.BLOOM -> {
                 val bloom = (rmsVolume * 8f).coerceIn(0f, 1f) * 0.06f
-                drawRect(color = Color(0xFF050508))
+                val bgC = if (isDark) Color(0xFF050508) else Color(0xFFF5F5FA)
+                drawRect(color = bgC)
                 drawRect(brush = Brush.radialGradient(
                     listOf(Color(0xFF7C6FFF).copy(alpha = bloom), Color.Transparent),
                     center = Offset(w * 0.5f, h * 0.5f),
@@ -365,7 +468,8 @@ private fun VisualizerCanvas(
                 ))
             }
             BackgroundEffect.NOISE -> {
-                drawRect(color = Color(0xFF050508))
+                val bgC = if (isDark) Color(0xFF050508) else Color(0xFFF5F5FA)
+                drawRect(color = bgC)
                 // Chromatic noise — random tiny dots at very low opacity
                 val rng = kotlin.random.Random(nowMs / 33L) // change ~30fps
                 repeat(200) {
@@ -382,7 +486,8 @@ private fun VisualizerCanvas(
                 }
             }
             BackgroundEffect.STARFIELD -> {
-                drawRect(color = Color(0xFF050508))
+                val bgC = if (isDark) Color(0xFF050508) else Color(0xFFF5F5FA)
+                drawRect(color = bgC)
                 stars.forEach { star ->
                     star.y += star.speed  // drift downward
                     if (star.y > 1f) { star.y = 0f; star.x = kotlin.random.Random.nextFloat() }
@@ -393,7 +498,10 @@ private fun VisualizerCanvas(
                     )
                 }
             }
-            BackgroundEffect.NONE -> drawRect(color = Color(0xFF050508))
+            BackgroundEffect.NONE -> {
+                val bgC = if (isDark) Color(0xFF050508) else Color(0xFFF5F5FA)
+                drawRect(color = bgC)
+            }
         }
 
         val laneW = w / bandCount
@@ -540,7 +648,7 @@ private fun VisualizerCanvas(
                     radius    = r,
                     center    = Offset(cx, cy),
                     style     = Stroke(width = 2.5f),
-                    blendMode = BlendMode.Screen
+                    blendMode = theme.shapeBlend
                 )
             } else {
                 drawShape(shifted, life, shape, angleRad)
@@ -984,6 +1092,19 @@ private fun TopHud(
                 fontFamily = FontFamily.Monospace)
         }
     }
+}
+
+// ── Tablet stat row ──────────────────────────────────────────────────────────
+@Composable
+private fun TabletStatRow(label: String, value: String, theme: ChromaColors) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        Arrangement.SpaceBetween, Alignment.CenterVertically) {
+        Text(label, color = theme.uiSubtle, fontSize = 9.sp,
+            fontFamily = FontFamily.Monospace, letterSpacing = 2.sp)
+        Text(value, color = theme.uiText, fontSize = 13.sp,
+            fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+    }
+    HorizontalDivider(color = theme.uiSubtle.copy(alpha = 0.1f), thickness = 1.dp)
 }
 
 // ── RMS history graph ────────────────────────────────────────────────────────

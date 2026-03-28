@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.chromasound.app.model.ColorScheme
 import com.chromasound.app.model.BackgroundEffect
+import com.chromasound.app.model.ThemeMode
 import com.chromasound.app.model.MirrorMode
 import com.chromasound.app.model.ObjectShape
 import com.chromasound.app.model.Settings
@@ -68,7 +69,8 @@ data class NamedPreset(
     val particlesEnabled: Boolean         = false,
     val particleThreshold:Float           = 0.6f,
     val oscilloscopeMode: Boolean         = false,
-    val backgroundEffect: BackgroundEffect = BackgroundEffect.NONE
+    val backgroundEffect: BackgroundEffect = BackgroundEffect.NONE,
+    val themeMode:        ThemeMode        = ThemeMode.DARK
 ) {
     fun toSettings(base: Settings) = base.copy(
         bandCount       = bandCount,
@@ -91,6 +93,7 @@ data class NamedPreset(
         particleThreshold = particleThreshold,
         oscilloscopeMode  = oscilloscopeMode,
         backgroundEffect  = backgroundEffect,
+        themeMode         = themeMode,
         bandColors        = emptyMap()
     )
 }
@@ -116,7 +119,8 @@ fun Settings.toPreset(name: String) = NamedPreset(
     particlesEnabled  = particlesEnabled,
     particleThreshold = particleThreshold,
     oscilloscopeMode  = oscilloscopeMode,
-    backgroundEffect  = backgroundEffect
+    backgroundEffect  = backgroundEffect,
+    themeMode         = themeMode
 )
 
 // ── Preset persistence ────────────────────────────────────────────────────────
@@ -158,7 +162,10 @@ fun loadPresets(context: Context): List<NamedPreset> {
                 oscilloscopeMode  = prefs.getBoolean("${i}_oscilloscopeMode", false),
                 backgroundEffect  = try { BackgroundEffect.valueOf(
                     prefs.getString("${i}_backgroundEffect", BackgroundEffect.NONE.name)!!) }
-                    catch (_: Exception) { BackgroundEffect.NONE }
+                    catch (_: Exception) { BackgroundEffect.NONE },
+                themeMode         = try { ThemeMode.valueOf(
+                    prefs.getString("${i}_themeMode", ThemeMode.DARK.name)!!) }
+                    catch (_: Exception) { ThemeMode.DARK }
             )
         } catch (_: Exception) { null }
     }
@@ -191,6 +198,7 @@ fun savePresets(context: Context, presets: List<NamedPreset>) {
             putFloat("${i}_particleThreshold",    p.particleThreshold)
             putBoolean("${i}_oscilloscopeMode",   p.oscilloscopeMode)
             putString("${i}_backgroundEffect",    p.backgroundEffect.name)
+            putString("${i}_themeMode",           p.themeMode.name)
         }
         apply()
     }

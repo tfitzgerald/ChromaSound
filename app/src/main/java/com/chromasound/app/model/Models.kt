@@ -31,10 +31,18 @@ enum class MirrorMode {
 // ── Background effect enum ────────────────────────────────────────────────────
 
 enum class BackgroundEffect {
-    NONE,      // solid near-black — current default
-    STARFIELD, // slow-moving low-opacity particles
-    BLOOM,     // background brightness pulses with RMS volume
-    NOISE      // subtle animated chromatic grain
+    NONE,
+    STARFIELD,
+    BLOOM,
+    NOISE
+}
+
+// ── Theme mode enum ───────────────────────────────────────────────────────────
+
+enum class ThemeMode {
+    DARK,   // always dark (default)
+    LIGHT,  // always light
+    SYSTEM  // follows device system setting
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
@@ -59,11 +67,10 @@ data class Settings(
     val showWaveform:    Boolean         = false,
     // Particle explosions — burst of particles on loud transients
     val particlesEnabled:   Boolean     = false,
-    val particleThreshold:  Float       = 0.6f,   // 0.0–1.0: fraction above band avg
-    // Oscilloscope ring mode — shapes pulse as rings rather than filled
+    val particleThreshold:  Float       = 0.6f,
     val oscilloscopeMode:   Boolean     = false,
-    // Background effect
-    val backgroundEffect:   BackgroundEffect = BackgroundEffect.NONE
+    val backgroundEffect:   BackgroundEffect = BackgroundEffect.NONE,
+    val themeMode:          ThemeMode   = ThemeMode.DARK
 ) {
     companion object {
         const val MIN_LIFETIME_MS           = 100L
