@@ -482,6 +482,15 @@ fun HelpScreen(onClose: () -> Unit) {
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Version 1.3.0",
+                color = UiSubtle.copy(alpha = 0.35f),
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
             Spacer(Modifier.height(40.dp))
         }
     }

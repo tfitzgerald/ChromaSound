@@ -145,9 +145,10 @@ private fun RunningScreen(
     onSettings:  () -> Unit
 ) {
     Box(Modifier.fillMaxSize()) {
-        BandLaneGrid(bandCount = state.bandCount, modifier = Modifier.fillMaxSize())
-        ShapeCanvas(
+        // Single canvas for both lane grid and shapes — one clear covers both layers
+        VisualizerCanvas(
             circles     = state.circles,
+            bandCount   = state.bandCount,
             shape       = objectShape,
             mirrorMode  = mirrorMode,
             trailLength = trailLength,
@@ -176,23 +177,15 @@ private fun RunningScreen(
     }
 }
 
-// ── Band lane grid ────────────────────────────────────────────────────────────
+// ── Unified visualiser canvas ─────────────────────────────────────────────────
+// A single Canvas composable draws everything — background clear, band lane
+// grid lines, trail ghosts, and live shapes — in the correct order.
+// Using one Canvas means one drawRect() clears everything atomically each frame,
+// preventing any layer from accumulating across recompositions.
 @Composable
-private fun BandLaneGrid(bandCount: Int, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val laneW = size.width / bandCount
-        for (i in 1 until bandCount) {
-            drawLine(color = Color.White.copy(alpha = 0.04f),
-                start = Offset(i * laneW, 0f), end = Offset(i * laneW, size.height),
-                strokeWidth = 1f)
-        }
-    }
-}
-
-// ── Shape canvas ──────────────────────────────────────────────────────────────
-@Composable
-private fun ShapeCanvas(
+private fun VisualizerCanvas(
     circles:     List<FrequencyCircle>,
+    bandCount:   Int,
     shape:       ObjectShape,
     mirrorMode:  MirrorMode,
     trailLength: Int,
@@ -234,11 +227,22 @@ private fun ShapeCanvas(
         val w = size.width
         val h = size.height
 
-        // Clear the canvas every frame — without this, previous frames accumulate
-        // because Compose Canvas does not auto-clear between recompositions.
+        // ── 1. Clear entire canvas every frame ────────────────────────────────
+        // Single drawRect covers all layers — no previous frame content survives.
         drawRect(color = Color(0xFF050508))
 
-        // Helper: draw all circles once, applying the given X/Y axis flips
+        // ── 2. Band lane grid lines ───────────────────────────────────────────
+        val laneW = w / bandCount
+        for (i in 1 until bandCount) {
+            drawLine(
+                color       = Color.White.copy(alpha = 0.04f),
+                start       = Offset(i * laneW, 0f),
+                end         = Offset(i * laneW, h),
+                strokeWidth = 1f
+            )
+        }
+
+        // ── 3. Helper: draw all circles (trails + live) with optional flip ────
         fun drawAll(flipX: Boolean, flipY: Boolean) {
             // Draw trail ghosts first (behind live shapes)
             if (trailLength > 0) {

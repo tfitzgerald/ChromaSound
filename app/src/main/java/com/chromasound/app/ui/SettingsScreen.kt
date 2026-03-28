@@ -538,6 +538,15 @@ fun SettingsScreen(
                 Text("DONE", fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold, letterSpacing = 4.sp, fontSize = 13.sp)
             }
+            Spacer(Modifier.height(20.dp))
+            Text(
+                "ChromaSound  ·  Version 1.3.0",
+                color = UiSubtle.copy(alpha = 0.35f),
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
             Spacer(Modifier.height(40.dp))
         }
     }
