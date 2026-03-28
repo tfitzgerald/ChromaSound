@@ -14,6 +14,7 @@ import com.chromasound.app.audio.AudioCaptureEngine.Companion.FFT_SIZE
 import com.chromasound.app.audio.AudioCaptureEngine.Companion.SAMPLE_RATE
 import com.chromasound.app.fft.FrequencyColorMapper
 import com.chromasound.app.model.AudioFrame
+import com.chromasound.app.model.BackgroundEffect
 import com.chromasound.app.model.BandDefinition
 import com.chromasound.app.model.ColorScheme
 import com.chromasound.app.model.FrequencyCircle
@@ -138,8 +139,10 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
             putFloat("beatSensitivity", s.beatSensitivity)
             putFloat("colorAnimSpeed",  s.colorAnimSpeed)
             putBoolean("showWaveform",  s.showWaveform)
-            // Note: bandColors (Map<Int,Color>) are not persisted — they reset on restart.
-            // Full persistence of custom band colours will be added in a future build.
+            putBoolean("particlesEnabled",   s.particlesEnabled)
+            putFloat("particleThreshold",    s.particleThreshold)
+            putBoolean("oscilloscopeMode",   s.oscilloscopeMode)
+            putString("backgroundEffect",    s.backgroundEffect.name)
             apply()
         }
     }
@@ -170,7 +173,13 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
                 beatSensitivity = prefs.getFloat("beatSensitivity", defaults.beatSensitivity),
                 colorAnimSpeed  = prefs.getFloat("colorAnimSpeed",  defaults.colorAnimSpeed),
                 showWaveform    = prefs.getBoolean("showWaveform",  defaults.showWaveform),
-                bandColors     = emptyMap()   // reset on every launch
+                particlesEnabled   = prefs.getBoolean("particlesEnabled",  defaults.particlesEnabled),
+                particleThreshold  = prefs.getFloat("particleThreshold",   defaults.particleThreshold),
+                oscilloscopeMode   = prefs.getBoolean("oscilloscopeMode",  defaults.oscilloscopeMode),
+                backgroundEffect   = try {
+                    BackgroundEffect.valueOf(prefs.getString("backgroundEffect", defaults.backgroundEffect.name) ?: defaults.backgroundEffect.name)
+                } catch (_: Exception) { defaults.backgroundEffect },
+                bandColors     = emptyMap()
             )
         } catch (_: Exception) {
             defaults  // fall back to defaults if prefs are corrupt
@@ -196,6 +205,10 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
             beatSensitivity = new.beatSensitivity.coerceIn(Settings.MIN_BEAT_SENSITIVITY, Settings.MAX_BEAT_SENSITIVITY),
             colorAnimSpeed  = new.colorAnimSpeed.coerceIn(Settings.MIN_COLOR_ANIM_SPEED, Settings.MAX_COLOR_ANIM_SPEED),
             showWaveform    = new.showWaveform,
+            particlesEnabled   = new.particlesEnabled,
+            particleThreshold  = new.particleThreshold.coerceIn(Settings.MIN_PARTICLE_THRESHOLD, Settings.MAX_PARTICLE_THRESHOLD),
+            oscilloscopeMode   = new.oscilloscopeMode,
+            backgroundEffect   = new.backgroundEffect,
             bandColors      = new.bandColors
         )
 

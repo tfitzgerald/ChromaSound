@@ -28,6 +28,15 @@ enum class MirrorMode {
     QUAD        // all four quadrants
 }
 
+// ── Background effect enum ────────────────────────────────────────────────────
+
+enum class BackgroundEffect {
+    NONE,      // solid near-black — current default
+    STARFIELD, // slow-moving low-opacity particles
+    BLOOM,     // background brightness pulses with RMS volume
+    NOISE      // subtle animated chromatic grain
+}
+
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 data class Settings(
@@ -45,39 +54,44 @@ data class Settings(
     val noiseGateDb:    Float            = -50f,
     val mirrorMode:     MirrorMode       = MirrorMode.OFF,
     val trailLength:    Int              = 0,
-    // Beat sensitivity — how much louder than recent average counts as a beat.
-    // 1.1 = very sensitive, 2.0 = only hard transients
-    val beatSensitivity: Float           = 1.3f,
-    // Colour animation — hue drift speed (0 = off, 1 = slow, 3 = fast)
-    val colorAnimSpeed:  Float           = 0f,
-    // Waveform overlay — draws a scrolling raw audio waveform at the bottom
-    val showWaveform:    Boolean          = false
+    val beatSensitivity: Float          = 1.3f,
+    val colorAnimSpeed:  Float          = 0f,
+    val showWaveform:    Boolean         = false,
+    // Particle explosions — burst of particles on loud transients
+    val particlesEnabled:   Boolean     = false,
+    val particleThreshold:  Float       = 0.6f,   // 0.0–1.0: fraction above band avg
+    // Oscilloscope ring mode — shapes pulse as rings rather than filled
+    val oscilloscopeMode:   Boolean     = false,
+    // Background effect
+    val backgroundEffect:   BackgroundEffect = BackgroundEffect.NONE
 ) {
     companion object {
-        const val MIN_LIFETIME_MS          = 100L
-        const val MAX_LIFETIME_MS          = 2000L
-        const val MIN_CIRCLES_PER_BAND     = 1
-        const val MAX_CIRCLES_PER_BAND     = 5
-        const val MIN_RADIUS_FLOOR         = 5f
-        const val MAX_RADIUS_FLOOR         = 120f
-        const val MIN_RADIUS_CEILING       = 20f
-        const val MAX_RADIUS_CEILING       = 250f
-        const val MIN_PLACEMENT            = 0f
-        const val MAX_PLACEMENT            = 1f
-        const val MIN_SENSITIVITY          = 0.1f
-        const val MAX_SENSITIVITY          = 3.0f
-        const val MIN_SUB_BANDS            = 1
-        const val MAX_SUB_BANDS            = 12
-        const val MIN_NOISE_GATE_DB        = -70f
-        const val MAX_NOISE_GATE_DB        = -20f
-        const val DEFAULT_NOISE_GATE_DB    = -50f
-        const val MIN_TRAIL_LENGTH         = 0
-        const val MAX_TRAIL_LENGTH         = 8
-        const val MIN_BEAT_SENSITIVITY     = 1.1f
-        const val MAX_BEAT_SENSITIVITY     = 2.5f
-        const val DEFAULT_BEAT_SENSITIVITY = 1.3f
-        const val MIN_COLOR_ANIM_SPEED     = 0f
-        const val MAX_COLOR_ANIM_SPEED     = 3f
+        const val MIN_LIFETIME_MS           = 100L
+        const val MAX_LIFETIME_MS           = 2000L
+        const val MIN_CIRCLES_PER_BAND      = 1
+        const val MAX_CIRCLES_PER_BAND      = 5
+        const val MIN_RADIUS_FLOOR          = 5f
+        const val MAX_RADIUS_FLOOR          = 120f
+        const val MIN_RADIUS_CEILING        = 20f
+        const val MAX_RADIUS_CEILING        = 250f
+        const val MIN_PLACEMENT             = 0f
+        const val MAX_PLACEMENT             = 1f
+        const val MIN_SENSITIVITY           = 0.1f
+        const val MAX_SENSITIVITY           = 3.0f
+        const val MIN_SUB_BANDS             = 1
+        const val MAX_SUB_BANDS             = 12
+        const val MIN_NOISE_GATE_DB         = -70f
+        const val MAX_NOISE_GATE_DB         = -20f
+        const val DEFAULT_NOISE_GATE_DB     = -50f
+        const val MIN_TRAIL_LENGTH          = 0
+        const val MAX_TRAIL_LENGTH          = 8
+        const val MIN_BEAT_SENSITIVITY      = 1.1f
+        const val MAX_BEAT_SENSITIVITY      = 2.5f
+        const val DEFAULT_BEAT_SENSITIVITY  = 1.3f
+        const val MIN_COLOR_ANIM_SPEED      = 0f
+        const val MAX_COLOR_ANIM_SPEED      = 3f
+        const val MIN_PARTICLE_THRESHOLD    = 0.1f
+        const val MAX_PARTICLE_THRESHOLD    = 1.0f
     }
 }
 

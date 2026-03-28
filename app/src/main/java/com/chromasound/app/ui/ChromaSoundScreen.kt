@@ -25,7 +25,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.chromasound.app.model.FrequencyCircle
+import com.chromasound.app.model.BackgroundEffect
 import com.chromasound.app.model.MirrorMode
 import com.chromasound.app.model.ObjectShape
 import com.chromasound.app.model.Settings
@@ -86,16 +88,20 @@ fun ChromaSoundScreen(
             when (uiState) {
                 is ChromaSoundUiState.Running ->
                     RunningScreen(
-                        state           = uiState,
-                        objectShape     = settings.objectShape,
-                        mirrorMode      = settings.mirrorMode,
-                        trailLength     = settings.trailLength,
-                        colorAnimSpeed  = settings.colorAnimSpeed,
-                        showWaveform    = settings.showWaveform,
-                        waveformSamples = waveformSamples,
-                        onStop          = onStopRequested,
-                        onSettings      = { showSettings = true },
-                        onScreenshot    = onScreenshotRequested
+                        state             = uiState,
+                        objectShape       = settings.objectShape,
+                        mirrorMode        = settings.mirrorMode,
+                        trailLength       = settings.trailLength,
+                        colorAnimSpeed    = settings.colorAnimSpeed,
+                        showWaveform      = settings.showWaveform,
+                        waveformSamples   = waveformSamples,
+                        particlesEnabled  = settings.particlesEnabled,
+                        particleThreshold = settings.particleThreshold,
+                        oscilloscopeMode  = settings.oscilloscopeMode,
+                        backgroundEffect  = settings.backgroundEffect,
+                        onStop            = onStopRequested,
+                        onSettings        = { showSettings = true },
+                        onScreenshot      = onScreenshotRequested
                     )
                 ChromaSoundUiState.PermissionDenied -> PermissionDeniedScreen()
                 else -> IdleScreen(
@@ -180,29 +186,38 @@ private fun IdleScreen(
 // ── Running ───────────────────────────────────────────────────────────────────
 @Composable
 private fun RunningScreen(
-    state:           ChromaSoundUiState.Running,
-    objectShape:     ObjectShape,
-    mirrorMode:      MirrorMode,
-    trailLength:     Int,
-    colorAnimSpeed:  Float,
-    showWaveform:    Boolean,
-    waveformSamples: List<Float>,
-    onStop:          () -> Unit,
-    onSettings:      () -> Unit,
-    onScreenshot:    () -> Unit
+    state:             ChromaSoundUiState.Running,
+    objectShape:       ObjectShape,
+    mirrorMode:        MirrorMode,
+    trailLength:       Int,
+    colorAnimSpeed:    Float,
+    showWaveform:      Boolean,
+    waveformSamples:   List<Float>,
+    particlesEnabled:  Boolean,
+    particleThreshold: Float,
+    oscilloscopeMode:  Boolean,
+    backgroundEffect:  BackgroundEffect,
+    onStop:            () -> Unit,
+    onSettings:        () -> Unit,
+    onScreenshot:      () -> Unit
 ) {
     Box(Modifier.fillMaxSize()) {
         VisualizerCanvas(
-            circles         = state.circles,
-            bandCount       = state.bandCount,
-            shape           = objectShape,
-            mirrorMode      = mirrorMode,
-            trailLength     = trailLength,
-            beatPulseMs     = state.beatPulseMs,
-            colorAnimSpeed  = colorAnimSpeed,
-            showWaveform    = showWaveform,
-            waveformSamples = waveformSamples,
-            modifier        = Modifier.fillMaxSize()
+            circles           = state.circles,
+            bandCount         = state.bandCount,
+            shape             = objectShape,
+            mirrorMode        = mirrorMode,
+            trailLength       = trailLength,
+            beatPulseMs       = state.beatPulseMs,
+            colorAnimSpeed    = colorAnimSpeed,
+            showWaveform      = showWaveform,
+            waveformSamples   = waveformSamples,
+            particlesEnabled  = particlesEnabled,
+            particleThreshold = particleThreshold,
+            oscilloscopeMode  = oscilloscopeMode,
+            backgroundEffect  = backgroundEffect,
+            rmsVolume         = state.rmsVolume,
+            modifier          = Modifier.fillMaxSize()
         )
         TopHud(
             rmsVolume   = state.rmsVolume,
@@ -244,20 +259,47 @@ private fun RunningScreen(
 // ── Unified visualiser canvas ─────────────────────────────────────────────────
 @Composable
 private fun VisualizerCanvas(
-    circles:         List<FrequencyCircle>,
-    bandCount:       Int,
-    shape:           ObjectShape,
-    mirrorMode:      MirrorMode,
-    trailLength:     Int,
-    beatPulseMs:     Long,
-    colorAnimSpeed:  Float,
-    showWaveform:    Boolean,
-    waveformSamples: List<Float>,
-    modifier:        Modifier = Modifier
+    circles:           List<FrequencyCircle>,
+    bandCount:         Int,
+    shape:             ObjectShape,
+    mirrorMode:        MirrorMode,
+    trailLength:       Int,
+    beatPulseMs:       Long,
+    colorAnimSpeed:    Float,
+    showWaveform:      Boolean,
+    waveformSamples:   List<Float>,
+    particlesEnabled:  Boolean,
+    particleThreshold: Float,
+    oscilloscopeMode:  Boolean,
+    backgroundEffect:  BackgroundEffect,
+    rmsVolume:         Float,
+    modifier:          Modifier = Modifier
 ) {
     var nowMs        by remember { mutableStateOf(System.currentTimeMillis()) }
     var angleRad     by remember { mutableStateOf(0f) }
     var hueOffsetDeg by remember { mutableStateOf(0f) }
+
+    // ── Particle system state ─────────────────────────────────────────────
+    data class Particle(
+        var x: Float, var y: Float,
+        var vx: Float, var vy: Float,
+        var life: Float,          // 1.0 = fresh, 0.0 = dead
+        val color: Color
+    )
+    val particles = remember { mutableStateListOf<Particle>() }
+    // Track last RMS per band for transient detection
+    val prevBandRms = remember { FloatArray(32) }
+
+    // ── Starfield state ───────────────────────────────────────────────────
+    data class Star(var x: Float, var y: Float, val speed: Float, val size: Float)
+    val stars = remember {
+        List(80) { Star(
+            x     = kotlin.random.Random.nextFloat(),
+            y     = kotlin.random.Random.nextFloat(),
+            speed = 0.00008f + kotlin.random.Random.nextFloat() * 0.00015f,
+            size  = 0.8f + kotlin.random.Random.nextFloat() * 1.6f
+        ) }
+    }
 
     // Trail history: a ring buffer of recent circle snapshots.
     // Each entry is a full List<FrequencyCircle> captured at that frame.
@@ -311,7 +353,48 @@ private fun VisualizerCanvas(
         val w = size.width
         val h = size.height
 
-        drawRect(color = Color(0xFF050508))
+        // ── 0. Background ─────────────────────────────────────────────────
+        when (backgroundEffect) {
+            BackgroundEffect.BLOOM -> {
+                val bloom = (rmsVolume * 8f).coerceIn(0f, 1f) * 0.06f
+                drawRect(color = Color(0xFF050508))
+                drawRect(brush = Brush.radialGradient(
+                    listOf(Color(0xFF7C6FFF).copy(alpha = bloom), Color.Transparent),
+                    center = Offset(w * 0.5f, h * 0.5f),
+                    radius = w * 0.8f
+                ))
+            }
+            BackgroundEffect.NOISE -> {
+                drawRect(color = Color(0xFF050508))
+                // Chromatic noise — random tiny dots at very low opacity
+                val rng = kotlin.random.Random(nowMs / 33L) // change ~30fps
+                repeat(200) {
+                    val nx = rng.nextFloat() * w
+                    val ny = rng.nextFloat() * h
+                    val nc = Color(
+                        red   = rng.nextFloat(),
+                        green = rng.nextFloat(),
+                        blue  = rng.nextFloat(),
+                        alpha = 0.03f + rng.nextFloat() * 0.04f
+                    )
+                    drawCircle(color = nc, radius = rng.nextFloat() * 1.5f + 0.5f,
+                        center = Offset(nx, ny))
+                }
+            }
+            BackgroundEffect.STARFIELD -> {
+                drawRect(color = Color(0xFF050508))
+                stars.forEach { star ->
+                    star.y += star.speed  // drift downward
+                    if (star.y > 1f) { star.y = 0f; star.x = kotlin.random.Random.nextFloat() }
+                    drawCircle(
+                        color  = Color.White.copy(alpha = 0.12f + star.size * 0.08f),
+                        radius = star.size,
+                        center = Offset(star.x * w, star.y * h)
+                    )
+                }
+            }
+            BackgroundEffect.NONE -> drawRect(color = Color(0xFF050508))
+        }
 
         val laneW = w / bandCount
         for (i in 1 until bandCount) {
@@ -323,7 +406,50 @@ private fun VisualizerCanvas(
             )
         }
 
-        // ── 3. Waveform overlay ───────────────────────────────────────────────
+        // ── 5. Particle explosions ────────────────────────────────────────────
+        if (particlesEnabled) {
+            val dt = 0.016f  // ~60fps timestep
+            // Spawn particles on transients (per circle)
+            circles.forEach { circle ->
+                val bandIdx = circle.bandIndex.coerceIn(0, prevBandRms.size - 1)
+                val rms     = circle.decibelLevel / -80f  // normalise dBFS to 0-1
+                val prev    = prevBandRms[bandIdx]
+                if (rms - prev > particleThreshold && rms > 0.1f) {
+                    // Emit a burst of 8 particles
+                    repeat(8) {
+                        val angle = kotlin.random.Random.nextFloat() * 2f * PI.toFloat()
+                        val speed = 1.5f + kotlin.random.Random.nextFloat() * 3f
+                        particles.add(Particle(
+                            x = circle.x * w, y = circle.y * h,
+                            vx = cos(angle) * speed,
+                            vy = sin(angle) * speed,
+                            life  = 1f,
+                            color = circle.color
+                        ))
+                    }
+                }
+                prevBandRms[bandIdx] = rms
+            }
+            // Update and draw live particles
+            val toRemove = mutableListOf<Particle>()
+            particles.forEach { p ->
+                p.x    += p.vx;  p.y += p.vy
+                p.vx   *= 0.92f; p.vy *= 0.92f  // drag
+                p.life -= dt * 2.5f
+                if (p.life <= 0f) { toRemove.add(p); return@forEach }
+                drawCircle(
+                    color  = p.color.copy(alpha = p.life * 0.85f),
+                    radius = 3f + p.life * 4f,
+                    center = Offset(p.x, p.y),
+                    blendMode = BlendMode.Screen
+                )
+            }
+            particles.removeAll(toRemove)
+            // Cap particle count
+            while (particles.size > 200) particles.removeAt(0)
+        }
+
+        // ── 6. Waveform overlay ───────────────────────────────────────────────
         if (showWaveform && waveformSamples.size > 1) {
             val waveH    = h * 1.5f              // full screen height (×10 of original 15%)
             val waveMid  = h * 0.5f              // centre of screen
@@ -360,6 +486,7 @@ private fun VisualizerCanvas(
         // Mirror mode works by computing reflected coordinates directly.
         // NO canvas transforms are used.
         // Hue drift: when colorAnimSpeed > 0, shift each circle's colour by hueOffsetDeg.
+        // Oscilloscope mode: shapes draw as pulsing rings instead of filled objects.
 
         fun shiftedColor(c: FrequencyCircle): Color {
             if (hueOffsetDeg == 0f) return c.color
@@ -393,17 +520,41 @@ private fun VisualizerCanvas(
                 radiusPx = circle.radiusPx * animatedPulse,
                 color    = shiftedColor(circle)
             )
-            drawShape(reflected, life, shape, angleRad)
+            drawShapePulsed(reflected, life)
         }
 
         fun drawShapePulsed(circle: FrequencyCircle, life: Float) {
-            drawShape(
-                circle.copy(
-                    radiusPx = circle.radiusPx * animatedPulse,
-                    color    = shiftedColor(circle)
-                ),
-                life, shape, angleRad
+            val shifted = circle.copy(
+                radiusPx = circle.radiusPx * animatedPulse,
+                color    = shiftedColor(circle)
             )
+            if (oscilloscopeMode) {
+                // Ring mode: draw a stroke circle whose radius pulses with waveform phase
+                val cx     = shifted.x * size.width
+                val cy     = shifted.y * size.height
+                val energy = shifted.subBandEnergies.average().toFloat()
+                val pulse  = 0.6f + energy * 0.8f  // contract/expand with energy
+                val r      = shifted.radiusPx * pulse
+                val alpha  = (life * 0.9f).coerceIn(0f, 1f)
+                // Outer glow ring
+                drawCircle(
+                    color     = shifted.color.copy(alpha = alpha * 0.25f),
+                    radius    = r * 1.3f,
+                    center    = Offset(cx, cy),
+                    style     = Stroke(width = r * 0.4f),
+                    blendMode = BlendMode.Screen
+                )
+                // Core ring
+                drawCircle(
+                    color     = shifted.color.copy(alpha = alpha),
+                    radius    = r,
+                    center    = Offset(cx, cy),
+                    style     = Stroke(width = 2.5f),
+                    blendMode = BlendMode.Screen
+                )
+            } else {
+                drawShape(shifted, life, shape, angleRad)
+            }
         }
 
         circles.forEach { circle ->
@@ -493,6 +644,10 @@ private fun VisualizerCanvas(
         }
     }
 }
+
+// ── Oscilloscope ring drawing helper ─────────────────────────────────────────
+// When oscilloscopeMode is on, drawShape is replaced by this ring renderer
+// called with the same circle — the radius oscillates with waveform phase.
 
 // ── Sub-band gradient builder ─────────────────────────────────────────────────
 /**

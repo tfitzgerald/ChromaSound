@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.chromasound.app.model.ColorScheme
+import com.chromasound.app.model.BackgroundEffect
 import com.chromasound.app.model.MirrorMode
 import com.chromasound.app.model.ObjectShape
 import com.chromasound.app.model.Settings
@@ -59,11 +60,15 @@ data class NamedPreset(
     val objectShape:    ObjectShape,
     val subBands:       Int,
     val noiseGateDb:    Float,
-    val mirrorMode:     MirrorMode  = MirrorMode.OFF,
-    val trailLength:    Int         = 0,
-    val beatSensitivity:Float       = 1.3f,
-    val colorAnimSpeed: Float       = 0f,
-    val showWaveform:   Boolean     = false
+    val mirrorMode:       MirrorMode      = MirrorMode.OFF,
+    val trailLength:      Int             = 0,
+    val beatSensitivity:  Float           = 1.3f,
+    val colorAnimSpeed:   Float           = 0f,
+    val showWaveform:     Boolean         = false,
+    val particlesEnabled: Boolean         = false,
+    val particleThreshold:Float           = 0.6f,
+    val oscilloscopeMode: Boolean         = false,
+    val backgroundEffect: BackgroundEffect = BackgroundEffect.NONE
 ) {
     fun toSettings(base: Settings) = base.copy(
         bandCount       = bandCount,
@@ -80,9 +85,13 @@ data class NamedPreset(
         mirrorMode      = mirrorMode,
         trailLength     = trailLength,
         beatSensitivity = beatSensitivity,
-        colorAnimSpeed  = colorAnimSpeed,
-        showWaveform    = showWaveform,
-        bandColors      = emptyMap()
+        colorAnimSpeed    = colorAnimSpeed,
+        showWaveform      = showWaveform,
+        particlesEnabled  = particlesEnabled,
+        particleThreshold = particleThreshold,
+        oscilloscopeMode  = oscilloscopeMode,
+        backgroundEffect  = backgroundEffect,
+        bandColors        = emptyMap()
     )
 }
 
@@ -102,8 +111,12 @@ fun Settings.toPreset(name: String) = NamedPreset(
     mirrorMode      = mirrorMode,
     trailLength     = trailLength,
     beatSensitivity = beatSensitivity,
-    colorAnimSpeed  = colorAnimSpeed,
-    showWaveform    = showWaveform
+    colorAnimSpeed    = colorAnimSpeed,
+    showWaveform      = showWaveform,
+    particlesEnabled  = particlesEnabled,
+    particleThreshold = particleThreshold,
+    oscilloscopeMode  = oscilloscopeMode,
+    backgroundEffect  = backgroundEffect
 )
 
 // ── Preset persistence ────────────────────────────────────────────────────────
@@ -139,7 +152,13 @@ fun loadPresets(context: Context): List<NamedPreset> {
                 trailLength     = prefs.getInt("${i}_trailLength",      0),
                 beatSensitivity = prefs.getFloat("${i}_beatSensitivity",1.3f),
                 colorAnimSpeed  = prefs.getFloat("${i}_colorAnimSpeed", 0f),
-                showWaveform    = prefs.getBoolean("${i}_showWaveform", false)
+                showWaveform      = prefs.getBoolean("${i}_showWaveform",     false),
+                particlesEnabled  = prefs.getBoolean("${i}_particlesEnabled", false),
+                particleThreshold = prefs.getFloat("${i}_particleThreshold",  0.6f),
+                oscilloscopeMode  = prefs.getBoolean("${i}_oscilloscopeMode", false),
+                backgroundEffect  = try { BackgroundEffect.valueOf(
+                    prefs.getString("${i}_backgroundEffect", BackgroundEffect.NONE.name)!!) }
+                    catch (_: Exception) { BackgroundEffect.NONE }
             )
         } catch (_: Exception) { null }
     }
@@ -167,7 +186,11 @@ fun savePresets(context: Context, presets: List<NamedPreset>) {
             putInt("${i}_trailLength",         p.trailLength)
             putFloat("${i}_beatSensitivity",   p.beatSensitivity)
             putFloat("${i}_colorAnimSpeed",    p.colorAnimSpeed)
-            putBoolean("${i}_showWaveform",    p.showWaveform)
+            putBoolean("${i}_showWaveform",       p.showWaveform)
+            putBoolean("${i}_particlesEnabled",   p.particlesEnabled)
+            putFloat("${i}_particleThreshold",    p.particleThreshold)
+            putBoolean("${i}_oscilloscopeMode",   p.oscilloscopeMode)
+            putString("${i}_backgroundEffect",    p.backgroundEffect.name)
         }
         apply()
     }

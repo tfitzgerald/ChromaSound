@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chromasound.app.model.BandDefinition
 import com.chromasound.app.model.ColorScheme
+import com.chromasound.app.model.BackgroundEffect
 import com.chromasound.app.model.MirrorMode
 import com.chromasound.app.model.ObjectShape
 import com.chromasound.app.model.Settings
@@ -62,7 +63,11 @@ fun SettingsScreen(
     var trailLength     by remember { mutableStateOf(currentSettings.trailLength.toFloat()) }
     var beatSensitivity by remember { mutableStateOf(currentSettings.beatSensitivity) }
     var colorAnimSpeed  by remember { mutableStateOf(currentSettings.colorAnimSpeed) }
-    var showWaveform    by remember { mutableStateOf(currentSettings.showWaveform) }
+    var showWaveform      by remember { mutableStateOf(currentSettings.showWaveform) }
+    var particlesEnabled  by remember { mutableStateOf(currentSettings.particlesEnabled) }
+    var particleThreshold by remember { mutableStateOf(currentSettings.particleThreshold) }
+    var oscilloscopeMode  by remember { mutableStateOf(currentSettings.oscilloscopeMode) }
+    var backgroundEffect  by remember { mutableStateOf(currentSettings.backgroundEffect) }
 
     var openSection by remember { mutableStateOf(Section.NONE) }
 
@@ -82,7 +87,11 @@ fun SettingsScreen(
         trailLength     = trailLength.roundToInt(),
         beatSensitivity = beatSensitivity,
         colorAnimSpeed  = colorAnimSpeed,
-        showWaveform    = showWaveform
+        showWaveform      = showWaveform,
+        particlesEnabled  = particlesEnabled,
+        particleThreshold = particleThreshold,
+        oscilloscopeMode  = oscilloscopeMode,
+        backgroundEffect  = backgroundEffect
     ))
 
     val sliderColors = SliderDefaults.colors(
@@ -134,18 +143,26 @@ fun SettingsScreen(
             onBack        = { openSection = Section.NONE }
         )
         Section.EFFECTS -> EffectsScreen(
-            mirrorMode      = mirrorMode,
-            trailLength     = trailLength,
-            beatSensitivity = beatSensitivity,
-            colorAnimSpeed  = colorAnimSpeed,
-            showWaveform    = showWaveform,
-            sliderColors    = sliderColors,
-            onMirrorMode    = { mirrorMode = it; emit() },
-            onTrailLength   = { trailLength = it; emit() },
-            onBeatSens      = { beatSensitivity = it; emit() },
-            onColorAnim     = { colorAnimSpeed = it; emit() },
-            onWaveform      = { showWaveform = it; emit() },
-            onBack          = { openSection = Section.NONE }
+            mirrorMode        = mirrorMode,
+            trailLength       = trailLength,
+            beatSensitivity   = beatSensitivity,
+            colorAnimSpeed    = colorAnimSpeed,
+            showWaveform      = showWaveform,
+            particlesEnabled  = particlesEnabled,
+            particleThreshold = particleThreshold,
+            oscilloscopeMode  = oscilloscopeMode,
+            backgroundEffect  = backgroundEffect,
+            sliderColors      = sliderColors,
+            onMirrorMode      = { mirrorMode = it; emit() },
+            onTrailLength     = { trailLength = it; emit() },
+            onBeatSens        = { beatSensitivity = it; emit() },
+            onColorAnim       = { colorAnimSpeed = it; emit() },
+            onWaveform        = { showWaveform = it; emit() },
+            onParticles       = { particlesEnabled = it; emit() },
+            onParticleThresh  = { particleThreshold = it; emit() },
+            onOscilloscope    = { oscilloscopeMode = it; emit() },
+            onBgEffect        = { backgroundEffect = it; emit() },
+            onBack            = { openSection = Section.NONE }
         )
         Section.NONE -> SettingsHubScreen(
             currentSettings = currentSettings,
@@ -302,7 +319,7 @@ private fun SettingsHubScreen(
 
         // ── Version footer ────────────────────────────────────────────────────────
         item {
-            Text("ChromaSound  ·  Version 2.0.0",
+            Text("ChromaSound  ·  Version 2.1.1",
                 color = UiSubtle.copy(alpha = 0.6f), fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
@@ -590,18 +607,26 @@ private fun VisualScreen(
 // ── EFFECTS ───────────────────────────────────────────────────────────────────
 @Composable
 private fun EffectsScreen(
-    mirrorMode:      MirrorMode,
-    trailLength:     Float,
-    beatSensitivity: Float,
-    colorAnimSpeed:  Float,
-    showWaveform:    Boolean,
-    sliderColors:    SliderColors,
-    onMirrorMode:    (MirrorMode) -> Unit,
-    onTrailLength:   (Float) -> Unit,
-    onBeatSens:      (Float) -> Unit,
-    onColorAnim:     (Float) -> Unit,
-    onWaveform:      (Boolean) -> Unit,
-    onBack:          () -> Unit
+    mirrorMode:        MirrorMode,
+    trailLength:       Float,
+    beatSensitivity:   Float,
+    colorAnimSpeed:    Float,
+    showWaveform:      Boolean,
+    particlesEnabled:  Boolean,
+    particleThreshold: Float,
+    oscilloscopeMode:  Boolean,
+    backgroundEffect:  BackgroundEffect,
+    sliderColors:      SliderColors,
+    onMirrorMode:      (MirrorMode) -> Unit,
+    onTrailLength:     (Float) -> Unit,
+    onBeatSens:        (Float) -> Unit,
+    onColorAnim:       (Float) -> Unit,
+    onWaveform:        (Boolean) -> Unit,
+    onParticles:       (Boolean) -> Unit,
+    onParticleThresh:  (Float) -> Unit,
+    onOscilloscope:    (Boolean) -> Unit,
+    onBgEffect:        (BackgroundEffect) -> Unit,
+    onBack:            () -> Unit
 ) {
     SubScreen("EFFECTS", "✨", Color(0xFF6BFFFF), onBack) {
         // Mirror mode
@@ -704,6 +729,116 @@ private fun EffectsScreen(
                     uncheckedTrackColor = UiSubtle.copy(alpha = 0.3f)
                 )
             )
+        }
+        Spacer(Modifier.height(14.dp))
+
+        // Oscilloscope ring mode
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .background(BgCard, RoundedCornerShape(16.dp))
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("OSCILLOSCOPE RING MODE", color = UiSubtle, fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+                Spacer(Modifier.height(3.dp))
+                Text(if (oscilloscopeMode) "Shapes draw as pulsing rings"
+                     else "Shapes draw as filled objects",
+                    color = UiText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+            }
+            Switch(
+                checked = oscilloscopeMode,
+                onCheckedChange = onOscilloscope,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor   = UiText,
+                    checkedTrackColor   = UiAccent,
+                    uncheckedThumbColor = UiSubtle,
+                    uncheckedTrackColor = UiSubtle.copy(alpha = 0.3f)
+                )
+            )
+        }
+        Spacer(Modifier.height(14.dp))
+
+        // Particle explosions
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .background(BgCard, RoundedCornerShape(16.dp))
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("PARTICLE EXPLOSIONS", color = UiSubtle, fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+                Spacer(Modifier.height(3.dp))
+                Text(if (particlesEnabled) "Bursts on loud transients"
+                     else "Particle explosions off",
+                    color = UiText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+            }
+            Switch(
+                checked = particlesEnabled,
+                onCheckedChange = onParticles,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor   = UiText,
+                    checkedTrackColor   = UiAccent,
+                    uncheckedThumbColor = UiSubtle,
+                    uncheckedTrackColor = UiSubtle.copy(alpha = 0.3f)
+                )
+            )
+        }
+        if (particlesEnabled) {
+            Spacer(Modifier.height(14.dp))
+            SettingCard("PARTICLE THRESHOLD",
+                "How loud above band average triggers a burst",
+                value = "${"%.0f".format(particleThreshold * 100)}%%", unit = "sensitivity") {
+                Slider(value = particleThreshold, onValueChange = onParticleThresh,
+                    valueRange = Settings.MIN_PARTICLE_THRESHOLD..Settings.MAX_PARTICLE_THRESHOLD,
+                    colors = sliderColors, modifier = Modifier.fillMaxWidth())
+                SliderLabels("10%%  very sensitive", "100%%  loud only")
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+
+        // Background effect selector
+        Column(Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(16.dp)).padding(20.dp)) {
+            Text("BACKGROUND EFFECT", color = UiSubtle, fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+            Spacer(Modifier.height(12.dp))
+            val bgOptions = listOf(
+                BackgroundEffect.NONE     to "None",
+                BackgroundEffect.STARFIELD to "Stars",
+                BackgroundEffect.BLOOM    to "Bloom",
+                BackgroundEffect.NOISE    to "Noise"
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                bgOptions.forEach { (effect, label) ->
+                    val selected = backgroundEffect == effect
+                    val emoji = when(effect) {
+                        BackgroundEffect.NONE      -> "■"
+                        BackgroundEffect.STARFIELD -> "✦"
+                        BackgroundEffect.BLOOM     -> "◉"
+                        BackgroundEffect.NOISE     -> "▦"
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (selected) UiAccent.copy(alpha = 0.18f) else Color.Transparent)
+                            .border(1.dp,
+                                if (selected) UiAccent else UiSubtle.copy(alpha = 0.35f),
+                                RoundedCornerShape(10.dp))
+                            .clickable { onBgEffect(effect) }
+                            .padding(vertical = 10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(emoji, fontSize = 16.sp,
+                            color = if (selected) UiAccent else UiSubtle)
+                        Spacer(Modifier.height(4.dp))
+                        Text(label, fontSize = 8.sp,
+                            color = if (selected) UiAccent else UiSubtle,
+                            fontFamily = FontFamily.Monospace)
+                    }
+                }
+            }
         }
     }
 }

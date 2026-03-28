@@ -2,6 +2,7 @@ package com.chromasound.app.ui
 
 import android.content.Context
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -76,6 +77,7 @@ private val pages = listOf(
 )
 
 // ── Screen ────────────────────────────────────────────────────────────────────
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingScreen(onDone: () -> Unit) {
     val context    = LocalContext.current
