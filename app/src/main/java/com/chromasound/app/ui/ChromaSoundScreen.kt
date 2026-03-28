@@ -451,17 +451,19 @@ private fun VisualizerCanvas(
         prevCircles = circles
     }
 
+    // Read rmsVolume and nowMs HERE in the composable body — NOT inside Canvas.
+    // Canvas{} is a DrawScope lambda, not a @Composable. State reads inside it
+    // are invisible to Compose's snapshot system and do NOT trigger redraws.
+    // By capturing them here, Compose registers them as dependencies and
+    // invalidates VisualizerCanvas every time either value changes.
+    val capturedRms   = rmsVolume
+    val capturedNowMs = nowMs
+
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
 
         // ── 0. Background ─────────────────────────────────────────────────
-        // IMPORTANT: Read rmsVolume and nowMs unconditionally here so Compose
-        // tracks them as state dependencies regardless of which branch executes.
-        // If they are only read inside a branch, Compose stops invalidating the
-        // canvas when they change (snapshot tracking only covers executed reads).
-        val bgRms   = rmsVolume
-        val bgNowMs = nowMs
         when (backgroundEffect) {
             // Canvas background is ALWAYS near-black regardless of theme.
             // Light theme applies to UI chrome (settings, HUD cards) but the
@@ -471,7 +473,7 @@ private fun VisualizerCanvas(
                 drawRect(color = Color(0xFF050508))
                 // Boost RMS heavily — raw values 0.002–0.05 need strong amplification
                 // Use a power curve so quiet sounds still show some bloom
-                val rmsAmp = (bgRms * 30f).coerceIn(0f, 1f)
+                val rmsAmp = (capturedRms * 30f).coerceIn(0f, 1f)
                 val bloom  = rmsAmp.let { it * it }.coerceIn(0f, 1f)  // power curve
 
                 // Layer 1: wide soft glow covering the whole screen
@@ -496,19 +498,40 @@ private fun VisualizerCanvas(
             }
             BackgroundEffect.NOISE -> {
                 drawRect(color = Color(0xFF050508))
-                val rng = kotlin.random.Random(bgNowMs / 33L)
-                repeat(400) {
-                    val nx = rng.nextFloat() * w
-                    val ny = rng.nextFloat() * h
+                // Two layers: a coarse slow-changing layer for depth,
+                // and a fine fast layer for grain texture
+                val rngSlow = kotlin.random.Random(capturedNowMs / 120L) // changes ~8fps
+                val rngFast = kotlin.random.Random(capturedNowMs / 33L)  // changes ~30fps
+
+                // Layer 1: large vivid blobs — clearly visible, slow drift
+                repeat(80) {
+                    val nx = rngSlow.nextFloat() * w
+                    val ny = rngSlow.nextFloat() * h
                     val nc = Color(
-                        red   = rng.nextFloat(),
-                        green = rng.nextFloat(),
-                        blue  = rng.nextFloat(),
-                        alpha = 0.08f + rng.nextFloat() * 0.12f
+                        red   = rngSlow.nextFloat(),
+                        green = rngSlow.nextFloat(),
+                        blue  = rngSlow.nextFloat(),
+                        alpha = 0.25f + rngSlow.nextFloat() * 0.35f  // 0.25–0.60
                     )
                     drawCircle(
                         color  = nc,
-                        radius = 1.5f + rng.nextFloat() * 2.5f,
+                        radius = 6f + rngSlow.nextFloat() * 14f,  // 6–20px
+                        center = Offset(nx, ny)
+                    )
+                }
+                // Layer 2: fine grain on top for texture
+                repeat(300) {
+                    val nx = rngFast.nextFloat() * w
+                    val ny = rngFast.nextFloat() * h
+                    val nc = Color(
+                        red   = rngFast.nextFloat(),
+                        green = rngFast.nextFloat(),
+                        blue  = rngFast.nextFloat(),
+                        alpha = 0.15f + rngFast.nextFloat() * 0.20f  // 0.15–0.35
+                    )
+                    drawCircle(
+                        color  = nc,
+                        radius = 2f + rngFast.nextFloat() * 3f,  // 2–5px
                         center = Offset(nx, ny)
                     )
                 }
