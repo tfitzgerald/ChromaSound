@@ -484,7 +484,7 @@ fun HelpScreen(onClose: () -> Unit) {
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                "Version 1.7.2",
+                "Version 1.8.0",
                 color = UiSubtle.copy(alpha = 0.5f),
                 fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace,

@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,12 +26,17 @@ import com.chromasound.app.model.ObjectShape
 import com.chromasound.app.model.Settings
 import kotlin.math.roundToInt
 
+// ── Palette ───────────────────────────────────────────────────────────────────
 private val BgColor  = Color(0xFF050508)
 private val BgCard   = Color(0xFF0F0F1A)
 private val UiAccent = Color(0xFF7C6FFF)
 private val UiText   = Color(0xFFE0DFF8)
 private val UiSubtle = Color(0xFF5A5870)
 
+// ── Which sub-screen is open ──────────────────────────────────────────────────
+private enum class Section { NONE, FREQUENCY, SIZE, AUDIO, VISUAL, EFFECTS }
+
+// ── Root settings screen ──────────────────────────────────────────────────────
 @Composable
 fun SettingsScreen(
     currentSettings:  Settings,
@@ -42,47 +46,44 @@ fun SettingsScreen(
     onOpenHelp:       () -> Unit = {},
     onOpenPresets:    () -> Unit = {}
 ) {
-    // Local state mirrors — UI stays snappy, ViewModel gets every change live
-    var bandCount      by remember { mutableStateOf(currentSettings.bandCount.toFloat()) }
-    var lifetimeMs     by remember { mutableStateOf(currentSettings.lifetimeMs.toFloat()) }
-    var circlesPerBand by remember { mutableStateOf(currentSettings.circlesPerBand.toFloat()) }
-    var minRadius      by remember { mutableStateOf(currentSettings.minRadiusPx) }
-    var maxRadius      by remember { mutableStateOf(currentSettings.maxRadiusPx) }
-    var placement      by remember { mutableStateOf(currentSettings.placement) }
-    var sensitivity    by remember { mutableStateOf(currentSettings.sensitivity) }
-    var colorScheme    by remember { mutableStateOf(currentSettings.colorScheme) }
-    var objectShape    by remember { mutableStateOf(currentSettings.objectShape) }
-    var subBands       by remember { mutableStateOf(currentSettings.subBands.toFloat()) }
-    var noiseGateDb    by remember { mutableStateOf(currentSettings.noiseGateDb) }
+    // All local state in one place — shared across sub-screens
+    var bandCount       by remember { mutableStateOf(currentSettings.bandCount.toFloat()) }
+    var lifetimeMs      by remember { mutableStateOf(currentSettings.lifetimeMs.toFloat()) }
+    var circlesPerBand  by remember { mutableStateOf(currentSettings.circlesPerBand.toFloat()) }
+    var minRadius       by remember { mutableStateOf(currentSettings.minRadiusPx) }
+    var maxRadius       by remember { mutableStateOf(currentSettings.maxRadiusPx) }
+    var placement       by remember { mutableStateOf(currentSettings.placement) }
+    var sensitivity     by remember { mutableStateOf(currentSettings.sensitivity) }
+    var colorScheme     by remember { mutableStateOf(currentSettings.colorScheme) }
+    var objectShape     by remember { mutableStateOf(currentSettings.objectShape) }
+    var subBands        by remember { mutableStateOf(currentSettings.subBands.toFloat()) }
+    var noiseGateDb     by remember { mutableStateOf(currentSettings.noiseGateDb) }
     var mirrorMode      by remember { mutableStateOf(currentSettings.mirrorMode) }
     var trailLength     by remember { mutableStateOf(currentSettings.trailLength.toFloat()) }
     var beatSensitivity by remember { mutableStateOf(currentSettings.beatSensitivity) }
     var colorAnimSpeed  by remember { mutableStateOf(currentSettings.colorAnimSpeed) }
     var showWaveform    by remember { mutableStateOf(currentSettings.showWaveform) }
 
+    var openSection by remember { mutableStateOf(Section.NONE) }
+
     fun emit() = onSettingsChange(Settings(
-        bandCount      = bandCount.roundToInt(),
-        lifetimeMs     = lifetimeMs.roundToInt().toLong(),
-        circlesPerBand = circlesPerBand.roundToInt(),
-        minRadiusPx    = minRadius,
-        maxRadiusPx    = maxRadius.coerceAtLeast(minRadius + 10f),
-        placement      = placement,
-        sensitivity    = sensitivity,
-        colorScheme    = colorScheme,
-        objectShape    = objectShape,
-        subBands       = subBands.roundToInt(),
-        noiseGateDb    = noiseGateDb,
+        bandCount       = bandCount.roundToInt(),
+        lifetimeMs      = lifetimeMs.roundToInt().toLong(),
+        circlesPerBand  = circlesPerBand.roundToInt(),
+        minRadiusPx     = minRadius,
+        maxRadiusPx     = maxRadius.coerceAtLeast(minRadius + 10f),
+        placement       = placement,
+        sensitivity     = sensitivity,
+        colorScheme     = colorScheme,
+        objectShape     = objectShape,
+        subBands        = subBands.roundToInt(),
+        noiseGateDb     = noiseGateDb,
         mirrorMode      = mirrorMode,
         trailLength     = trailLength.roundToInt(),
         beatSensitivity = beatSensitivity,
         colorAnimSpeed  = colorAnimSpeed,
         showWaveform    = showWaveform
     ))
-
-    val bands     = remember(bandCount.roundToInt()) { BandDefinition.build(bandCount.roundToInt()) }
-    val bandItems = remember(bands) {
-        (0 until bands.count).map { Triple(it + 1, bands.lowerHz[it], bands.upperHz[it]) }
-    }
 
     val sliderColors = SliderDefaults.colors(
         thumbColor         = UiAccent,
@@ -92,12 +93,108 @@ fun SettingsScreen(
         inactiveTickColor  = Color.Transparent
     )
 
+    when (openSection) {
+        Section.FREQUENCY -> FrequencyTimingScreen(
+            bandCount      = bandCount,
+            lifetimeMs     = lifetimeMs,
+            circlesPerBand = circlesPerBand,
+            sliderColors   = sliderColors,
+            onBandCount    = { bandCount = it; emit() },
+            onLifetime     = { lifetimeMs = it; emit() },
+            onCircles      = { circlesPerBand = it; emit() },
+            onBack         = { openSection = Section.NONE }
+        )
+        Section.SIZE -> SizePositionScreen(
+            minRadius    = minRadius,
+            maxRadius    = maxRadius,
+            placement    = placement,
+            sliderColors = sliderColors,
+            onMinRadius  = { minRadius = it; if (maxRadius < it + 10f) maxRadius = it + 10f; emit() },
+            onMaxRadius  = { maxRadius = it.coerceAtLeast(minRadius + 10f); emit() },
+            onPlacement  = { placement = it; emit() },
+            onBack       = { openSection = Section.NONE }
+        )
+        Section.AUDIO -> AudioScreen(
+            sensitivity  = sensitivity,
+            noiseGateDb  = noiseGateDb,
+            sliderColors = sliderColors,
+            onSensitivity = { sensitivity = it; emit() },
+            onNoiseGate   = { noiseGateDb = it; emit() },
+            onBack        = { openSection = Section.NONE }
+        )
+        Section.VISUAL -> VisualScreen(
+            subBands      = subBands,
+            colorScheme   = colorScheme,
+            objectShape   = objectShape,
+            sliderColors  = sliderColors,
+            onSubBands    = { subBands = it; emit() },
+            onColorScheme = { colorScheme = it; emit() },
+            onObjectShape = { objectShape = it; emit() },
+            onBandColors  = onOpenBandColors,
+            onBack        = { openSection = Section.NONE }
+        )
+        Section.EFFECTS -> EffectsScreen(
+            mirrorMode      = mirrorMode,
+            trailLength     = trailLength,
+            beatSensitivity = beatSensitivity,
+            colorAnimSpeed  = colorAnimSpeed,
+            showWaveform    = showWaveform,
+            sliderColors    = sliderColors,
+            onMirrorMode    = { mirrorMode = it; emit() },
+            onTrailLength   = { trailLength = it; emit() },
+            onBeatSens      = { beatSensitivity = it; emit() },
+            onColorAnim     = { colorAnimSpeed = it; emit() },
+            onWaveform      = { showWaveform = it; emit() },
+            onBack          = { openSection = Section.NONE }
+        )
+        Section.NONE -> SettingsHubScreen(
+            currentSettings = currentSettings,
+            onSection       = { openSection = it },
+            onClose         = onClose,
+            onOpenHelp      = onOpenHelp,
+            onOpenPresets   = onOpenPresets
+        )
+    }
+}
+
+// ── Hub screen ────────────────────────────────────────────────────────────────
+@Composable
+private fun SettingsHubScreen(
+    currentSettings: Settings,
+    onSection:       (Section) -> Unit,
+    onClose:         () -> Unit,
+    onOpenHelp:      () -> Unit,
+    onOpenPresets:   () -> Unit
+) {
+    val sections = listOf(
+        Triple(Section.FREQUENCY, "FREQUENCY & TIMING",
+            "Bands · Lifetime · Circles per band"),
+        Triple(Section.SIZE,      "SIZE & POSITION",
+            "Min size · Max size · Placement"),
+        Triple(Section.AUDIO,     "AUDIO",
+            "Mic sensitivity · Noise gate"),
+        Triple(Section.VISUAL,    "VISUAL",
+            "Sub-band shading · Colour scheme · Shape"),
+        Triple(Section.EFFECTS,   "EFFECTS",
+            "Mirror · Trails · Beat · Colour animation · Waveform")
+    )
+    val sectionEmoji = mapOf(
+        Section.FREQUENCY to "🎵",
+        Section.SIZE      to "📐",
+        Section.AUDIO     to "🎙",
+        Section.VISUAL    to "🎨",
+        Section.EFFECTS   to "✨"
+    )
+    val sectionAccent = listOf(
+        Color(0xFF7C6FFF), Color(0xFF42E5F5),
+        Color(0xFFFF6B6B), Color(0xFFFFCC00), Color(0xFF6BFFFF)
+    )
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(BgColor).padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-
-        // ── Header ────────────────────────────────────────────────────────────
+        // ── Header ─────────────────────────────────────────────────────────────
         item {
             Spacer(Modifier.height(56.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -105,14 +202,18 @@ fun SettingsScreen(
                     onClick = onClose,
                     shape = RoundedCornerShape(50),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = UiText),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, UiSubtle),
+                    border = ButtonDefaults.outlinedButtonColors().let {
+                        androidx.compose.foundation.BorderStroke(1.dp, UiSubtle)
+                    },
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    Text("← BACK", fontFamily = FontFamily.Monospace, fontSize = 11.sp, letterSpacing = 2.sp)
+                    Text("← BACK", fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp, letterSpacing = 2.sp)
                 }
                 Spacer(Modifier.weight(1f))
                 Text("SETTINGS", color = UiText, fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold, fontFamily = FontFamily.Monospace, letterSpacing = 4.sp)
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = FontFamily.Monospace, letterSpacing = 4.sp)
                 Spacer(Modifier.weight(1f))
                 OutlinedButton(
                     onClick = onOpenHelp,
@@ -121,789 +222,523 @@ fun SettingsScreen(
                     border = androidx.compose.foundation.BorderStroke(1.dp, UiAccent.copy(alpha = 0.5f)),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                 ) {
-                    Text("?  HELP", fontFamily = FontFamily.Monospace, fontSize = 11.sp,
-                        letterSpacing = 2.sp, color = UiAccent)
+                    Text("?  HELP", fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp, letterSpacing = 2.sp, color = UiAccent)
                 }
             }
-            Spacer(Modifier.height(28.dp))
-        }
-
-
-        // ── SECTION: FREQUENCY & TIMING ──────────────────────────────────────────
-        item {
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                HorizontalDivider(
-                    modifier = Modifier.weight(1f),
-                    color = UiAccent.copy(alpha = 0.3f),
-                    thickness = 1.dp
-                )
-                Text(
-                    "  FREQUENCY & TIMING  ",
-                    color = UiAccent,
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp
-                )
-                HorizontalDivider(
-                    modifier = Modifier.weight(1f),
-                    color = UiAccent.copy(alpha = 0.3f),
-                    thickness = 1.dp
-                )
-            }
-            Spacer(Modifier.height(12.dp))
-        }
-
-        // ── 1. Frequency bands ────────────────────────────────────────────────
-        item {
-            SettingCard("FREQUENCY BANDS", "30 Hz  –  11 kHz",
-                value = "${bandCount.roundToInt()}", unit = "bands") {
-                Slider(value = bandCount, onValueChange = { bandCount = it; emit() },
-                    valueRange = BandDefinition.MIN_BANDS.toFloat()..BandDefinition.MAX_BANDS.toFloat(),
-                    steps = BandDefinition.MAX_BANDS - BandDefinition.MIN_BANDS - 1,
-                    colors = sliderColors, modifier = Modifier.fillMaxWidth())
-                SliderLabels("${BandDefinition.MIN_BANDS}", "${BandDefinition.MAX_BANDS}")
-            }
-            Spacer(Modifier.height(14.dp))
-        }
-
-        // ── 2. Circle lifetime ────────────────────────────────────────────────
-        item {
-            SettingCard("CIRCLE LIFETIME", "How long each circle stays visible",
-                value = formatMs(lifetimeMs.roundToInt().toLong()), unit = "") {
-                Slider(value = lifetimeMs, onValueChange = { lifetimeMs = it; emit() },
-                    valueRange = Settings.MIN_LIFETIME_MS.toFloat()..Settings.MAX_LIFETIME_MS.toFloat(),
-                    steps = 18, colors = sliderColors, modifier = Modifier.fillMaxWidth())
-                SliderLabels(formatMs(Settings.MIN_LIFETIME_MS), formatMs(Settings.MAX_LIFETIME_MS))
-            }
-            Spacer(Modifier.height(14.dp))
-        }
-
-        // ── 3. Circles per band ───────────────────────────────────────────────
-        item {
-            SettingCard("CIRCLES PER BAND", "Max simultaneous circles per frequency band",
-                value = "${circlesPerBand.roundToInt()}",
-                unit = if (circlesPerBand.roundToInt() == 1) "circle" else "circles") {
-                Slider(value = circlesPerBand, onValueChange = { circlesPerBand = it; emit() },
-                    valueRange = Settings.MIN_CIRCLES_PER_BAND.toFloat()..Settings.MAX_CIRCLES_PER_BAND.toFloat(),
-                    steps = Settings.MAX_CIRCLES_PER_BAND - Settings.MIN_CIRCLES_PER_BAND - 1,
-                    colors = sliderColors, modifier = Modifier.fillMaxWidth())
-                SliderLabels("${Settings.MIN_CIRCLES_PER_BAND}", "${Settings.MAX_CIRCLES_PER_BAND}")
-            }
-            Spacer(Modifier.height(14.dp))
-        }
-
-
-        // ── SECTION: SIZE & POSITION ──────────────────────────────────────────
-        item {
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                HorizontalDivider(
-                    modifier = Modifier.weight(1f),
-                    color = UiAccent.copy(alpha = 0.3f),
-                    thickness = 1.dp
-                )
-                Text(
-                    "  SIZE & POSITION  ",
-                    color = UiAccent,
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp
-                )
-                HorizontalDivider(
-                    modifier = Modifier.weight(1f),
-                    color = UiAccent.copy(alpha = 0.3f),
-                    thickness = 1.dp
-                )
-            }
-            Spacer(Modifier.height(12.dp))
-        }
-
-        // ── 4. Minimum circle size ────────────────────────────────────────────
-        item {
-            SettingCard("MINIMUM CIRCLE SIZE", "Radius at the quietest detectable level",
-                value = "${minRadius.roundToInt()}", unit = "px") {
-                Slider(value = minRadius, onValueChange = {
-                    minRadius = it
-                    if (maxRadius < minRadius + 10f) maxRadius = minRadius + 10f
-                    emit()
-                }, valueRange = Settings.MIN_RADIUS_FLOOR..Settings.MAX_RADIUS_FLOOR,
-                    colors = sliderColors, modifier = Modifier.fillMaxWidth())
-                SliderLabels("${Settings.MIN_RADIUS_FLOOR.roundToInt()} px", "${Settings.MAX_RADIUS_FLOOR.roundToInt()} px")
-            }
-            Spacer(Modifier.height(14.dp))
-        }
-
-        // ── 5. Maximum circle size ────────────────────────────────────────────
-        item {
-            SettingCard("MAXIMUM CIRCLE SIZE", "Radius at the loudest detectable level",
-                value = "${maxRadius.roundToInt()}", unit = "px") {
-                Slider(value = maxRadius, onValueChange = { maxRadius = it.coerceAtLeast(minRadius + 10f); emit() },
-                    valueRange = Settings.MIN_RADIUS_CEILING..Settings.MAX_RADIUS_CEILING,
-                    colors = sliderColors, modifier = Modifier.fillMaxWidth())
-                SliderLabels("${Settings.MIN_RADIUS_CEILING.roundToInt()} px", "${Settings.MAX_RADIUS_CEILING.roundToInt()} px")
-            }
-            Spacer(Modifier.height(14.dp))
-        }
-
-        // ── 6. Placement randomness ───────────────────────────────────────────
-        item {
-            SettingCard("CIRCLE PLACEMENT", "How randomly circles scatter from their band column",
-                value = placementLabel(placement), unit = "") {
-                Slider(value = placement, onValueChange = { placement = it; emit() },
-                    valueRange = Settings.MIN_PLACEMENT..Settings.MAX_PLACEMENT,
-                    colors = sliderColors, modifier = Modifier.fillMaxWidth())
-                SliderLabels("Grid-locked", "Full random")
-            }
-            Spacer(Modifier.height(14.dp))
-        }
-
-
-        // ── SECTION: AUDIO ──────────────────────────────────────────
-        item {
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                HorizontalDivider(
-                    modifier = Modifier.weight(1f),
-                    color = UiAccent.copy(alpha = 0.3f),
-                    thickness = 1.dp
-                )
-                Text(
-                    "  AUDIO  ",
-                    color = UiAccent,
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp
-                )
-                HorizontalDivider(
-                    modifier = Modifier.weight(1f),
-                    color = UiAccent.copy(alpha = 0.3f),
-                    thickness = 1.dp
-                )
-            }
-            Spacer(Modifier.height(12.dp))
-        }
-
-        // ── 7. Microphone sensitivity ─────────────────────────────────────────
-        item {
-            SettingCard("MIC SENSITIVITY", "Amplify or reduce response to incoming audio",
-                value = "×${"%.1f".format(sensitivity)}", unit = "") {
-                Slider(value = sensitivity, onValueChange = { sensitivity = it; emit() },
-                    valueRange = Settings.MIN_SENSITIVITY..Settings.MAX_SENSITIVITY,
-                    colors = sliderColors, modifier = Modifier.fillMaxWidth())
-                SliderLabels("×${"%.1f".format(Settings.MIN_SENSITIVITY)} low", "×${"%.1f".format(Settings.MAX_SENSITIVITY)} high")
-            }
-            Spacer(Modifier.height(14.dp))
-        }
-
-        // ── 7b. Noise gate ────────────────────────────────────────────────────
-        item {
-            SettingCard("NOISE GATE", "Minimum level a band must reach to appear",
-                value = "${noiseGateDb.roundToInt()} dB", unit = "threshold") {
-                Slider(value = noiseGateDb,
-                    onValueChange = { noiseGateDb = it; emit() },
-                    valueRange = Settings.MIN_NOISE_GATE_DB..Settings.MAX_NOISE_GATE_DB,
-                    colors = sliderColors, modifier = Modifier.fillMaxWidth())
-                SliderLabels(
-                    "${Settings.MIN_NOISE_GATE_DB.roundToInt()} dB  very sensitive",
-                    "${Settings.MAX_NOISE_GATE_DB.roundToInt()} dB  loud only"
-                )
-            }
-            Spacer(Modifier.height(14.dp))
-        }
-
-
-        // ── SECTION: VISUAL ──────────────────────────────────────────
-        item {
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                HorizontalDivider(
-                    modifier = Modifier.weight(1f),
-                    color = UiAccent.copy(alpha = 0.3f),
-                    thickness = 1.dp
-                )
-                Text(
-                    "  VISUAL  ",
-                    color = UiAccent,
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp
-                )
-                HorizontalDivider(
-                    modifier = Modifier.weight(1f),
-                    color = UiAccent.copy(alpha = 0.3f),
-                    thickness = 1.dp
-                )
-            }
-            Spacer(Modifier.height(12.dp))
-        }
-
-        // ── 8. Sub-band shading ───────────────────────────────────────────────
-        item {
-            SettingCard("SUB-BAND SHADING",
-                "Radial shading rings from centre to edge (1 = solid colour)",
-                value = if (subBands.roundToInt() == 1) "Off" else "${subBands.roundToInt()}",
-                unit  = if (subBands.roundToInt() == 1) "" else "rings") {
-                Slider(value = subBands, onValueChange = { subBands = it; emit() },
-                    valueRange = Settings.MIN_SUB_BANDS.toFloat()..Settings.MAX_SUB_BANDS.toFloat(),
-                    steps  = Settings.MAX_SUB_BANDS - Settings.MIN_SUB_BANDS - 1,
-                    colors = sliderColors, modifier = Modifier.fillMaxWidth())
-                SliderLabels("Off (1)", "${Settings.MAX_SUB_BANDS} rings")
-            }
-            Spacer(Modifier.height(14.dp))
-        }
-
-        // ── 9. Color scheme toggle ────────────────────────────────────────────
-        item {
-            Column(
-                modifier = Modifier.fillMaxWidth()
-                    .background(BgCard, RoundedCornerShape(16.dp))
-                    .padding(20.dp)
-            ) {
-                Text("COLOR SCHEME", color = UiSubtle, fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
-                Spacer(Modifier.height(4.dp))
-                Text("Hue order across frequency bands",
-                    color = UiText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                Spacer(Modifier.height(16.dp))
-
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ColorSchemeButton(
-                        label      = "RAINBOW",
-                        subLabel   = "Violet → Red",
-                        isSelected = colorScheme == ColorScheme.RAINBOW,
-                        gradientColors = listOf(
-                            Color(0xFF8B00FF), Color(0xFF0000FF), Color(0xFF00FFFF),
-                            Color(0xFF00FF00), Color(0xFFFFFF00), Color(0xFFFF0000)
-                        ),
-                        modifier = Modifier.weight(1f),
-                        onClick  = { colorScheme = ColorScheme.RAINBOW; emit() }
-                    )
-                    ColorSchemeButton(
-                        label      = "INVERSE",
-                        subLabel   = "Red → Violet",
-                        isSelected = colorScheme == ColorScheme.INVERSE_RAINBOW,
-                        gradientColors = listOf(
-                            Color(0xFFFF0000), Color(0xFFFFFF00), Color(0xFF00FF00),
-                            Color(0xFF00FFFF), Color(0xFF0000FF), Color(0xFF8B00FF)
-                        ),
-                        modifier = Modifier.weight(1f),
-                        onClick  = { colorScheme = ColorScheme.INVERSE_RAINBOW; emit() }
-                    )
-                }
-            }
+            Spacer(Modifier.height(8.dp))
+            Text("Tap a section to adjust its settings",
+                color = UiSubtle, fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(24.dp))
         }
 
-        // ── 10. Object shape selector ──────────────────────────────────────────
-        item {
-            Column(
-                modifier = Modifier.fillMaxWidth()
-                    .background(BgCard, RoundedCornerShape(16.dp))
-                    .padding(20.dp)
-            ) {
-                Text("OBJECT SHAPE", color = UiSubtle, fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
-                Spacer(Modifier.height(4.dp))
-                Text("Shape used to represent each frequency band",
-                    color = UiText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                Spacer(Modifier.height(16.dp))
-
-                // Row 1: Circle, Star, 2D Box
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ShapeButton(emoji = "●", label = "CIRCLE",
-                        isSelected = objectShape == ObjectShape.CIRCLE,
-                        modifier = Modifier.weight(1f),
-                        onClick = { objectShape = ObjectShape.CIRCLE; emit() })
-                    ShapeButton(emoji = "★", label = "STAR",
-                        isSelected = objectShape == ObjectShape.STAR,
-                        modifier = Modifier.weight(1f),
-                        onClick = { objectShape = ObjectShape.STAR; emit() })
-                    ShapeButton(emoji = "■", label = "2D BOX",
-                        isSelected = objectShape == ObjectShape.BOX_2D,
-                        modifier = Modifier.weight(1f),
-                        onClick = { objectShape = ObjectShape.BOX_2D; emit() })
-                }
-                Spacer(Modifier.height(10.dp))
-                // Row 2: 3D Box, Sphere — with rotating note
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ShapeButton(emoji = "⬡", label = "3D BOX",
-                        subLabel = "rotating",
-                        isSelected = objectShape == ObjectShape.BOX_3D,
-                        modifier = Modifier.weight(1f),
-                        onClick = { objectShape = ObjectShape.BOX_3D; emit() })
-                    ShapeButton(emoji = "◉", label = "SPHERE",
-                        subLabel = "rotating",
-                        isSelected = objectShape == ObjectShape.SPHERE,
-                        modifier = Modifier.weight(1f),
-                        onClick = { objectShape = ObjectShape.SPHERE; emit() })
-                    Spacer(Modifier.weight(1f))
-                }
-            }
-            Spacer(Modifier.height(24.dp))
-        }
-
-
-        // ── SECTION: EFFECTS ──────────────────────────────────────────
-        item {
-            Spacer(Modifier.height(12.dp))
+        // ── Section buttons ─────────────────────────────────────────────────────
+        itemsIndexed(sections) { idx, (section, label, subtitle) ->
+            val accent = sectionAccent[idx]
+            val emoji  = sectionEmoji[section] ?: ""
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                HorizontalDivider(
-                    modifier = Modifier.weight(1f),
-                    color = UiAccent.copy(alpha = 0.3f),
-                    thickness = 1.dp
-                )
-                Text(
-                    "  EFFECTS  ",
-                    color = UiAccent,
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp
-                )
-                HorizontalDivider(
-                    modifier = Modifier.weight(1f),
-                    color = UiAccent.copy(alpha = 0.3f),
-                    thickness = 1.dp
-                )
-            }
-            Spacer(Modifier.height(12.dp))
-        }
-
-        // ── Mirror mode ───────────────────────────────────────────────────────
-        item {
-            val modes = MirrorMode.entries.toList()
-            val modeLabels = mapOf(
-                MirrorMode.OFF        to "Off",
-                MirrorMode.HORIZONTAL to "H",
-                MirrorMode.VERTICAL   to "V",
-                MirrorMode.QUAD       to "Quad"
-            )
-            val modeEmoji = mapOf(
-                MirrorMode.OFF        to "▣",
-                MirrorMode.HORIZONTAL to "◫",
-                MirrorMode.VERTICAL   to "⬒",
-                MirrorMode.QUAD       to "⧈"
-            )
-            Column(
-                modifier = Modifier.fillMaxWidth()
-                    .background(BgCard, RoundedCornerShape(16.dp))
-                    .padding(20.dp)
-            ) {
-                Text("MIRROR MODE", color = UiSubtle, fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
-                Spacer(Modifier.height(4.dp))
-                Text("Reflect shapes across canvas axes",
-                    color = UiText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                Spacer(Modifier.height(14.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    modes.forEach { mode ->
-                        val selected = mirrorMode == mode
-                        Column(
-                            modifier = Modifier.weight(1f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (selected) UiAccent.copy(alpha = 0.18f) else Color.Transparent)
-                                .border(1.dp,
-                                    if (selected) UiAccent else UiSubtle.copy(alpha = 0.35f),
-                                    RoundedCornerShape(10.dp))
-                                .clickable { mirrorMode = mode; emit() }
-                                .padding(vertical = 10.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(modeEmoji[mode] ?: "", fontSize = 18.sp)
-                            Spacer(Modifier.height(4.dp))
-                            Text(modeLabels[mode] ?: "",
-                                color = if (selected) UiAccent else UiSubtle,
-                                fontSize = 10.sp, fontFamily = FontFamily.Monospace,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(14.dp))
-        }
-
-        // ── Trail length ──────────────────────────────────────────────────────
-        item {
-            val trailInt = trailLength.roundToInt()
-            SettingCard(
-                "SHAPE TRAILS",
-                "Ghost frames trailing behind each shape",
-                value = if (trailInt == 0) "Off" else "$trailInt",
-                unit  = if (trailInt == 0) "" else "frames"
-            ) {
-                Slider(
-                    value       = trailLength,
-                    onValueChange = { trailLength = it; emit() },
-                    valueRange  = Settings.MIN_TRAIL_LENGTH.toFloat()..Settings.MAX_TRAIL_LENGTH.toFloat(),
-                    steps       = Settings.MAX_TRAIL_LENGTH - 1,
-                    colors      = sliderColors,
-                    modifier    = Modifier.fillMaxWidth()
-                )
-                SliderLabels("Off", "${Settings.MAX_TRAIL_LENGTH} frames")
-            }
-            Spacer(Modifier.height(14.dp))
-        }
-
-        // ── Beat sensitivity ──────────────────────────────────────────────────
-        item {
-            SettingCard(
-                "BEAT SENSITIVITY",
-                "How loud above average to count as a beat",
-                value  = "×${"%.1f".format(beatSensitivity)}",
-                unit   = "threshold"
-            ) {
-                Slider(
-                    value         = beatSensitivity,
-                    onValueChange = { beatSensitivity = it; emit() },
-                    valueRange    = Settings.MIN_BEAT_SENSITIVITY..Settings.MAX_BEAT_SENSITIVITY,
-                    colors        = sliderColors,
-                    modifier      = Modifier.fillMaxWidth()
-                )
-                SliderLabels("×1.1  very sensitive", "×2.5  hard hits only")
-            }
-            Spacer(Modifier.height(14.dp))
-        }
-
-        // ── Colour animation speed ────────────────────────────────────────────
-        item {
-            SettingCard(
-                "COLOUR ANIMATION",
-                "Hue cycles continuously over time",
-                value = if (colorAnimSpeed == 0f) "Off" else "${"%.1f".format(colorAnimSpeed)}×",
-                unit  = if (colorAnimSpeed == 0f) "" else "speed"
-            ) {
-                Slider(
-                    value         = colorAnimSpeed,
-                    onValueChange = { colorAnimSpeed = it; emit() },
-                    valueRange    = Settings.MIN_COLOR_ANIM_SPEED..Settings.MAX_COLOR_ANIM_SPEED,
-                    colors        = sliderColors,
-                    modifier      = Modifier.fillMaxWidth()
-                )
-                SliderLabels("Off", "3× fast")
-            }
-            Spacer(Modifier.height(14.dp))
-        }
-
-        // ── Waveform overlay toggle ───────────────────────────────────────────
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .background(BgCard, RoundedCornerShape(16.dp))
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(BgCard)
+                    .border(1.dp, accent.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+                    .clickable { onSection(section) }
                     .padding(20.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Box(
+                    Modifier.size(48.dp)
+                        .background(accent.copy(alpha = 0.12f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) { Text(emoji, fontSize = 22.sp) }
+                Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("WAVEFORM OVERLAY", color = UiSubtle, fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+                    Text(label, color = accent, fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp)
                     Spacer(Modifier.height(3.dp))
-                    Text(
-                        if (showWaveform) "Scrolling audio waveform visible"
-                        else "Waveform hidden",
-                        color = UiText, fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
+                    Text(subtitle, color = UiSubtle, fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace)
                 }
-                Switch(
-                    checked         = showWaveform,
-                    onCheckedChange = { showWaveform = it; emit() },
-                    colors          = SwitchDefaults.colors(
-                        checkedThumbColor   = UiText,
-                        checkedTrackColor   = UiAccent,
-                        uncheckedThumbColor = UiSubtle,
-                        uncheckedTrackColor = UiSubtle.copy(alpha = 0.3f)
-                    )
-                )
+                Text("→", color = accent, fontSize = 18.sp,
+                    fontFamily = FontFamily.Monospace)
             }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(12.dp))
         }
 
-        // ── Presets navigation ────────────────────────────────────────────────
+        // ── Presets shortcut ─────────────────────────────────────────────────────
         item {
+            Spacer(Modifier.height(4.dp))
             Row(
-                modifier = Modifier.fillMaxWidth()
-                    .background(BgCard, RoundedCornerShape(16.dp))
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(BgCard)
                     .clickable { onOpenPresets() }
                     .padding(20.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Box(
+                    Modifier.size(48.dp)
+                        .background(UiAccent.copy(alpha = 0.12f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) { Text("🎛", fontSize = 22.sp) }
+                Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("PRESETS", color = UiSubtle, fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+                    Text("PRESETS", color = UiAccent, fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp)
                     Spacer(Modifier.height(3.dp))
                     Text("Save, load and apply colour themes",
-                        color = UiText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                }
-                Text("🎛", fontSize = 20.sp)
-                Spacer(Modifier.width(8.dp))
-                Text("→", color = UiAccent, fontSize = 18.sp,
-                    fontFamily = FontFamily.Monospace)
-            }
-            Spacer(Modifier.height(14.dp))
-        }
-
-        // ── Band colours navigation ───────────────────────────────────────────
-        item {
-            val overrideCount = currentSettings.bandColors.size
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .background(BgCard, RoundedCornerShape(16.dp))
-                    .clickable { onOpenBandColors() }
-                    .padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("BAND COLOURS", color = UiSubtle, fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
-                    Spacer(Modifier.height(3.dp))
-                    Text(
-                        if (overrideCount == 0) "Using colour scheme for all bands"
-                        else "$overrideCount band${if (overrideCount == 1) "" else "s"} with custom colour",
-                        color = UiText, fontSize = 11.sp, fontFamily = FontFamily.Monospace
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                // Mini colour previews of overridden bands
-                if (overrideCount > 0) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        currentSettings.bandColors.values.take(6).forEach { col ->
-                            Box(Modifier.size(18.dp).clip(CircleShape).background(col))
-                        }
-                        if (overrideCount > 6) {
-                            Text("+${overrideCount - 6}", color = UiSubtle,
-                                fontSize = 10.sp, fontFamily = FontFamily.Monospace)
-                        }
-                    }
-                    Spacer(Modifier.width(8.dp))
+                        color = UiSubtle, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
                 }
                 Text("→", color = UiAccent, fontSize = 18.sp,
                     fontFamily = FontFamily.Monospace)
-            }
-            Spacer(Modifier.height(24.dp))
-        }
-
-        // ── Band breakdown ────────────────────────────────────────────────────
-        item {
-            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                Text("BAND BREAKDOWN", color = UiSubtle, fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
-                Text("${bandCount.roundToInt()} bands", color = UiAccent,
-                    fontSize = 10.sp, fontFamily = FontFamily.Monospace)
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .background(BgCard, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("#",    color = UiSubtle, fontSize = 11.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.width(32.dp))
-                Text("LOW",  color = UiSubtle, fontSize = 11.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f))
-                Text("–",    color = UiSubtle, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                Text("HIGH", color = UiSubtle, fontSize = 11.sp, fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.weight(1f), textAlign = TextAlign.End)
-            }
-        }
-
-        itemsIndexed(bandItems) { index, (number, low, high) ->
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .background(if (index % 2 == 0) BgCard else BgCard.copy(alpha = 0.6f))
-                    .padding(horizontal = 16.dp, vertical = 9.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    Modifier.width(32.dp)
-                        .background(UiAccent.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("$number", color = UiAccent, fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                }
-                Text(formatBandHz(low), color = UiText, fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center)
-                Text("–", color = UiSubtle, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
-                Text(formatBandHz(high), color = UiText, fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center)
-            }
-            if (index == bandItems.size - 1) {
-                Spacer(Modifier.fillMaxWidth().height(12.dp)
-                    .background(BgCard, RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)))
-            }
-        }
-
-        // ── Done ──────────────────────────────────────────────────────────────
-        item {
-            Spacer(Modifier.height(32.dp))
-            Button(
-                onClick = onClose,
-                shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.buttonColors(containerColor = UiAccent),
-                modifier = Modifier.fillMaxWidth(0.6f).height(50.dp)
-            ) {
-                Text("DONE", fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold, letterSpacing = 4.sp, fontSize = 13.sp)
             }
             Spacer(Modifier.height(20.dp))
-            Text(
-                "ChromaSound  ·  Version 1.7.2",
-                color = UiSubtle.copy(alpha = 0.6f),
-                fontSize = 13.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
+        }
+
+        // ── Version footer ────────────────────────────────────────────────────────
+        item {
+            Text("ChromaSound  ·  Version 1.8.0",
+                color = UiSubtle.copy(alpha = 0.6f), fontSize = 13.sp,
+                fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(40.dp))
         }
     }
 }
 
-// ── Color scheme button ───────────────────────────────────────────────────────
-
+// ── Sub-screen scaffold ───────────────────────────────────────────────────────
 @Composable
-private fun ColorSchemeButton(
-    label:          String,
-    subLabel:       String,
-    isSelected:     Boolean,
-    gradientColors: List<Color>,
-    modifier:       Modifier = Modifier,
-    onClick:        () -> Unit
+private fun SubScreen(
+    title:   String,
+    emoji:   String,
+    accent:  Color = UiAccent,
+    onBack:  () -> Unit,
+    content: @Composable ColumnScope.() -> Unit
 ) {
-    val borderColor = if (isSelected) UiAccent else UiSubtle.copy(alpha = 0.3f)
-    val bgColor     = if (isSelected) UiAccent.copy(alpha = 0.12f) else BgColor
-
     Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(bgColor)
-            .border(
-                width = if (isSelected) 2.dp else 1.dp,
-                color = borderColor,
-                shape = RoundedCornerShape(12.dp)
-            )
-            .clickable(onClick = onClick)
-            .padding(14.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        Modifier.fillMaxSize().background(BgColor)
     ) {
-        // Rainbow gradient preview bar
-        Box(
-            Modifier.fillMaxWidth().height(10.dp)
-                .clip(RoundedCornerShape(50))
-                .background(Brush.horizontalGradient(gradientColors))
-        )
-        Spacer(Modifier.height(10.dp))
-        Text(label, color = if (isSelected) UiAccent else UiText,
-            fontSize = 11.sp, fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace, letterSpacing = 2.sp)
-        Text(subLabel, color = UiSubtle, fontSize = 9.sp,
-            fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center)
-        if (isSelected) {
-            Spacer(Modifier.height(6.dp))
-            Text("✓  ACTIVE", color = UiAccent, fontSize = 9.sp,
-                fontFamily = FontFamily.Monospace, letterSpacing = 2.sp)
+        // Fixed header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(BgCard)
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedButton(
+                onClick = onBack,
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = UiText),
+                border = androidx.compose.foundation.BorderStroke(1.dp, UiSubtle),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+            ) {
+                Text("← BACK", fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp, letterSpacing = 2.sp)
+            }
+            Spacer(Modifier.width(12.dp))
+            Text(emoji, fontSize = 18.sp)
+            Spacer(Modifier.width(8.dp))
+            Text(title, color = accent, fontSize = 13.sp,
+                fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp)
+        }
+        // Scrollable content
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            item {
+                Spacer(Modifier.height(16.dp))
+                Column(content = content)
+                Spacer(Modifier.height(48.dp))
+            }
         }
     }
 }
 
+// ── FREQUENCY & TIMING ────────────────────────────────────────────────────────
 @Composable
-private fun ShapeButton(
-    emoji:      String,
-    label:      String,
-    subLabel:   String   = "",
-    isSelected: Boolean,
-    modifier:   Modifier = Modifier,
-    onClick:    () -> Unit
+private fun FrequencyTimingScreen(
+    bandCount:      Float,
+    lifetimeMs:     Float,
+    circlesPerBand: Float,
+    sliderColors:   SliderColors,
+    onBandCount:    (Float) -> Unit,
+    onLifetime:     (Float) -> Unit,
+    onCircles:      (Float) -> Unit,
+    onBack:         () -> Unit
 ) {
-    val borderColor = if (isSelected) UiAccent else UiSubtle.copy(alpha = 0.3f)
-    val bgColor     = if (isSelected) UiAccent.copy(alpha = 0.12f) else BgColor
-
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(bgColor)
-            .border(
-                width = if (isSelected) 2.dp else 1.dp,
-                color = borderColor,
-                shape = RoundedCornerShape(12.dp)
-            )
-            .clickable(onClick = onClick)
-            .padding(vertical = 14.dp, horizontal = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(emoji, fontSize = 26.sp,
-            color = if (isSelected) UiAccent else UiText)
-        Spacer(Modifier.height(6.dp))
-        Text(label, color = if (isSelected) UiAccent else UiText,
-            fontSize = 10.sp, fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace, letterSpacing = 1.sp,
-            textAlign = TextAlign.Center)
-        if (subLabel.isNotEmpty()) {
-            Text(subLabel, color = UiSubtle, fontSize = 9.sp,
-                fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center)
+    SubScreen("FREQUENCY & TIMING", "🎵", Color(0xFF7C6FFF), onBack) {
+        SettingCard("FREQUENCY BANDS", "30 Hz – 11 kHz",
+            value = "${bandCount.roundToInt()}", unit = "bands") {
+            Slider(value = bandCount, onValueChange = onBandCount,
+                valueRange = BandDefinition.MIN_BANDS.toFloat()..BandDefinition.MAX_BANDS.toFloat(),
+                steps = BandDefinition.MAX_BANDS - BandDefinition.MIN_BANDS - 1,
+                colors = sliderColors, modifier = Modifier.fillMaxWidth())
+            SliderLabels("${BandDefinition.MIN_BANDS}", "${BandDefinition.MAX_BANDS}")
         }
-        if (isSelected) {
+        Spacer(Modifier.height(14.dp))
+        SettingCard("CIRCLE LIFETIME", "How long each shape stays visible",
+            value = formatMs(lifetimeMs.roundToInt().toLong()), unit = "") {
+            Slider(value = lifetimeMs, onValueChange = onLifetime,
+                valueRange = Settings.MIN_LIFETIME_MS.toFloat()..Settings.MAX_LIFETIME_MS.toFloat(),
+                steps = 18, colors = sliderColors, modifier = Modifier.fillMaxWidth())
+            SliderLabels(formatMs(Settings.MIN_LIFETIME_MS), formatMs(Settings.MAX_LIFETIME_MS))
+        }
+        Spacer(Modifier.height(14.dp))
+        SettingCard("CIRCLES PER BAND", "Max simultaneous shapes per frequency band",
+            value = "${circlesPerBand.roundToInt()}",
+            unit = if (circlesPerBand.roundToInt() == 1) "circle" else "circles") {
+            Slider(value = circlesPerBand, onValueChange = onCircles,
+                valueRange = Settings.MIN_CIRCLES_PER_BAND.toFloat()..Settings.MAX_CIRCLES_PER_BAND.toFloat(),
+                steps = Settings.MAX_CIRCLES_PER_BAND - Settings.MIN_CIRCLES_PER_BAND - 1,
+                colors = sliderColors, modifier = Modifier.fillMaxWidth())
+            SliderLabels("${Settings.MIN_CIRCLES_PER_BAND}", "${Settings.MAX_CIRCLES_PER_BAND}")
+        }
+    }
+}
+
+// ── SIZE & POSITION ───────────────────────────────────────────────────────────
+@Composable
+private fun SizePositionScreen(
+    minRadius:   Float,
+    maxRadius:   Float,
+    placement:   Float,
+    sliderColors: SliderColors,
+    onMinRadius: (Float) -> Unit,
+    onMaxRadius: (Float) -> Unit,
+    onPlacement: (Float) -> Unit,
+    onBack:      () -> Unit
+) {
+    SubScreen("SIZE & POSITION", "📐", Color(0xFF42E5F5), onBack) {
+        SettingCard("MINIMUM SIZE", "Radius at the quietest detectable level",
+            value = "${minRadius.roundToInt()}", unit = "px") {
+            Slider(value = minRadius, onValueChange = onMinRadius,
+                valueRange = Settings.MIN_RADIUS_FLOOR..Settings.MAX_RADIUS_FLOOR,
+                colors = sliderColors, modifier = Modifier.fillMaxWidth())
+            SliderLabels("${Settings.MIN_RADIUS_FLOOR.roundToInt()} px",
+                "${Settings.MAX_RADIUS_FLOOR.roundToInt()} px")
+        }
+        Spacer(Modifier.height(14.dp))
+        SettingCard("MAXIMUM SIZE", "Radius at the loudest detectable level",
+            value = "${maxRadius.roundToInt()}", unit = "px") {
+            Slider(value = maxRadius, onValueChange = onMaxRadius,
+                valueRange = Settings.MIN_RADIUS_CEILING..Settings.MAX_RADIUS_CEILING,
+                colors = sliderColors, modifier = Modifier.fillMaxWidth())
+            SliderLabels("${Settings.MIN_RADIUS_CEILING.roundToInt()} px",
+                "${Settings.MAX_RADIUS_CEILING.roundToInt()} px")
+        }
+        Spacer(Modifier.height(14.dp))
+        SettingCard("PLACEMENT", "How randomly shapes scatter from their band column",
+            value = placementLabel(placement), unit = "") {
+            Slider(value = placement, onValueChange = onPlacement,
+                valueRange = Settings.MIN_PLACEMENT..Settings.MAX_PLACEMENT,
+                colors = sliderColors, modifier = Modifier.fillMaxWidth())
+            SliderLabels("Grid-locked", "Full random")
+        }
+    }
+}
+
+// ── AUDIO ─────────────────────────────────────────────────────────────────────
+@Composable
+private fun AudioScreen(
+    sensitivity:   Float,
+    noiseGateDb:   Float,
+    sliderColors:  SliderColors,
+    onSensitivity: (Float) -> Unit,
+    onNoiseGate:   (Float) -> Unit,
+    onBack:        () -> Unit
+) {
+    SubScreen("AUDIO", "🎙", Color(0xFFFF6B6B), onBack) {
+        SettingCard("MIC SENSITIVITY", "Amplify or reduce response to incoming audio",
+            value = "×${"%.1f".format(sensitivity)}", unit = "") {
+            Slider(value = sensitivity, onValueChange = onSensitivity,
+                valueRange = Settings.MIN_SENSITIVITY..Settings.MAX_SENSITIVITY,
+                colors = sliderColors, modifier = Modifier.fillMaxWidth())
+            SliderLabels("×${"%.1f".format(Settings.MIN_SENSITIVITY)} low",
+                "×${"%.1f".format(Settings.MAX_SENSITIVITY)} high")
+        }
+        Spacer(Modifier.height(14.dp))
+        SettingCard("NOISE GATE", "Minimum level a band must reach to appear",
+            value = "${noiseGateDb.roundToInt()} dB", unit = "threshold") {
+            Slider(value = noiseGateDb, onValueChange = onNoiseGate,
+                valueRange = Settings.MIN_NOISE_GATE_DB..Settings.MAX_NOISE_GATE_DB,
+                colors = sliderColors, modifier = Modifier.fillMaxWidth())
+            SliderLabels("${Settings.MIN_NOISE_GATE_DB.roundToInt()} dB  very sensitive",
+                "${Settings.MAX_NOISE_GATE_DB.roundToInt()} dB  loud only")
+        }
+    }
+}
+
+// ── VISUAL ────────────────────────────────────────────────────────────────────
+@Composable
+private fun VisualScreen(
+    subBands:      Float,
+    colorScheme:   ColorScheme,
+    objectShape:   ObjectShape,
+    sliderColors:  SliderColors,
+    onSubBands:    (Float) -> Unit,
+    onColorScheme: (ColorScheme) -> Unit,
+    onObjectShape: (ObjectShape) -> Unit,
+    onBandColors:  () -> Unit,
+    onBack:        () -> Unit
+) {
+    SubScreen("VISUAL", "🎨", Color(0xFFFFCC00), onBack) {
+        SettingCard("SUB-BAND SHADING",
+            "Radial shading rings from centre to edge (1 = solid colour)",
+            value = if (subBands.roundToInt() == 1) "Off" else "${subBands.roundToInt()}",
+            unit  = if (subBands.roundToInt() == 1) "" else "rings") {
+            Slider(value = subBands, onValueChange = onSubBands,
+                valueRange = Settings.MIN_SUB_BANDS.toFloat()..Settings.MAX_SUB_BANDS.toFloat(),
+                steps = Settings.MAX_SUB_BANDS - Settings.MIN_SUB_BANDS - 1,
+                colors = sliderColors, modifier = Modifier.fillMaxWidth())
+            SliderLabels("Off (1)", "${Settings.MAX_SUB_BANDS} rings")
+        }
+        Spacer(Modifier.height(14.dp))
+
+        // Color scheme
+        Column(Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(16.dp)).padding(20.dp)) {
+            Text("COLOR SCHEME", color = UiSubtle, fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ColorScheme.entries.forEach { scheme ->
+                    ColorSchemeButton(
+                        label    = if (scheme == ColorScheme.RAINBOW) "Rainbow" else "Inverse",
+                        gradient = if (scheme == ColorScheme.RAINBOW)
+                            listOf(Color(0xFFFF0000), Color(0xFF00FF00), Color(0xFF0000FF))
+                        else
+                            listOf(Color(0xFF0000FF), Color(0xFF00FF00), Color(0xFFFF0000)),
+                        selected = colorScheme == scheme,
+                        modifier = Modifier.weight(1f),
+                        onClick  = { onColorScheme(scheme) }
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+
+        // Object shape
+        Column(Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(16.dp)).padding(20.dp)) {
+            Text("OBJECT SHAPE", color = UiSubtle, fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+            Spacer(Modifier.height(12.dp))
+            val shapes = ObjectShape.entries
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                shapes.forEach { shape ->
+                    val selected = objectShape == shape
+                    val emoji = when (shape) {
+                        ObjectShape.CIRCLE -> "●"; ObjectShape.STAR -> "★"
+                        ObjectShape.BOX_2D -> "■"; ObjectShape.BOX_3D -> "⬡"
+                        ObjectShape.SPHERE -> "◉"
+                    }
+                    val label = when (shape) {
+                        ObjectShape.CIRCLE -> "Circle"; ObjectShape.STAR -> "Star"
+                        ObjectShape.BOX_2D -> "Box"; ObjectShape.BOX_3D -> "3D"
+                        ObjectShape.SPHERE -> "Sphere"
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (selected) UiAccent.copy(alpha = 0.18f) else Color.Transparent)
+                            .border(1.dp,
+                                if (selected) UiAccent else UiSubtle.copy(alpha = 0.35f),
+                                RoundedCornerShape(10.dp))
+                            .clickable { onObjectShape(shape) }
+                            .padding(vertical = 10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(emoji, fontSize = 16.sp,
+                            color = if (selected) UiAccent else UiSubtle)
+                        Spacer(Modifier.height(4.dp))
+                        Text(label, fontSize = 8.sp,
+                            color = if (selected) UiAccent else UiSubtle,
+                            fontFamily = FontFamily.Monospace)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+
+        // Band colours shortcut
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(BgCard)
+                .clickable { onBandColors() }
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("BAND COLOURS", color = UiSubtle, fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+                Spacer(Modifier.height(3.dp))
+                Text("Override colour per frequency band",
+                    color = UiText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+            }
+            Text("→", color = UiAccent, fontSize = 18.sp, fontFamily = FontFamily.Monospace)
+        }
+    }
+}
+
+// ── EFFECTS ───────────────────────────────────────────────────────────────────
+@Composable
+private fun EffectsScreen(
+    mirrorMode:      MirrorMode,
+    trailLength:     Float,
+    beatSensitivity: Float,
+    colorAnimSpeed:  Float,
+    showWaveform:    Boolean,
+    sliderColors:    SliderColors,
+    onMirrorMode:    (MirrorMode) -> Unit,
+    onTrailLength:   (Float) -> Unit,
+    onBeatSens:      (Float) -> Unit,
+    onColorAnim:     (Float) -> Unit,
+    onWaveform:      (Boolean) -> Unit,
+    onBack:          () -> Unit
+) {
+    SubScreen("EFFECTS", "✨", Color(0xFF6BFFFF), onBack) {
+        // Mirror mode
+        val modes = MirrorMode.entries.toList()
+        val modeLabels = mapOf(
+            MirrorMode.OFF to "Off", MirrorMode.HORIZONTAL to "H",
+            MirrorMode.VERTICAL to "V", MirrorMode.QUAD to "Quad")
+        val modeEmoji = mapOf(
+            MirrorMode.OFF to "▣", MirrorMode.HORIZONTAL to "◫",
+            MirrorMode.VERTICAL to "⬒", MirrorMode.QUAD to "⧈")
+        Column(Modifier.fillMaxWidth().background(BgCard, RoundedCornerShape(16.dp)).padding(20.dp)) {
+            Text("MIRROR MODE", color = UiSubtle, fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
             Spacer(Modifier.height(4.dp))
-            Text("✓", color = UiAccent, fontSize = 10.sp,
-                fontFamily = FontFamily.Monospace)
+            Text("Reflect shapes across canvas axes",
+                color = UiText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+            Spacer(Modifier.height(14.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                modes.forEach { mode ->
+                    val selected = mirrorMode == mode
+                    Column(
+                        modifier = Modifier.weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (selected) UiAccent.copy(alpha = 0.18f) else Color.Transparent)
+                            .border(1.dp,
+                                if (selected) UiAccent else UiSubtle.copy(alpha = 0.35f),
+                                RoundedCornerShape(10.dp))
+                            .clickable { onMirrorMode(mode) }
+                            .padding(vertical = 10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(modeEmoji[mode] ?: "", fontSize = 16.sp,
+                            color = if (selected) UiAccent else UiSubtle)
+                        Spacer(Modifier.height(4.dp))
+                        Text(modeLabels[mode] ?: "", fontSize = 9.sp,
+                            color = if (selected) UiAccent else UiSubtle,
+                            fontFamily = FontFamily.Monospace)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+
+        val trailInt = trailLength.roundToInt()
+        SettingCard("SHAPE TRAILS",
+            "Ghost copies behind each shape",
+            value  = if (trailInt == 0) "Off" else "$trailInt",
+            unit   = if (trailInt == 0) "" else if (trailInt == 1) "ghost" else "ghosts") {
+            Slider(value = trailLength, onValueChange = onTrailLength,
+                valueRange = Settings.MIN_TRAIL_LENGTH.toFloat()..Settings.MAX_TRAIL_LENGTH.toFloat(),
+                steps = Settings.MAX_TRAIL_LENGTH - Settings.MIN_TRAIL_LENGTH - 1,
+                colors = sliderColors, modifier = Modifier.fillMaxWidth())
+            SliderLabels("Off", "${Settings.MAX_TRAIL_LENGTH} frames")
+        }
+        Spacer(Modifier.height(14.dp))
+
+        SettingCard("BEAT SENSITIVITY",
+            "How loud above average to count as a beat",
+            value = "×${"%.1f".format(beatSensitivity)}", unit = "threshold") {
+            Slider(value = beatSensitivity, onValueChange = onBeatSens,
+                valueRange = Settings.MIN_BEAT_SENSITIVITY..Settings.MAX_BEAT_SENSITIVITY,
+                colors = sliderColors, modifier = Modifier.fillMaxWidth())
+            SliderLabels("×1.1  very sensitive", "×2.5  hard hits only")
+        }
+        Spacer(Modifier.height(14.dp))
+
+        SettingCard("COLOUR ANIMATION",
+            "Hue cycles continuously over time",
+            value = if (colorAnimSpeed == 0f) "Off" else "${"%.1f".format(colorAnimSpeed)}×",
+            unit  = if (colorAnimSpeed == 0f) "" else "speed") {
+            Slider(value = colorAnimSpeed, onValueChange = onColorAnim,
+                valueRange = Settings.MIN_COLOR_ANIM_SPEED..Settings.MAX_COLOR_ANIM_SPEED,
+                colors = sliderColors, modifier = Modifier.fillMaxWidth())
+            SliderLabels("Off", "3× fast")
+        }
+        Spacer(Modifier.height(14.dp))
+
+        // Waveform toggle
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .background(BgCard, RoundedCornerShape(16.dp))
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("WAVEFORM OVERLAY", color = UiSubtle, fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+                Spacer(Modifier.height(3.dp))
+                Text(if (showWaveform) "Scrolling audio waveform visible"
+                     else "Waveform hidden",
+                    color = UiText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+            }
+            Switch(
+                checked = showWaveform,
+                onCheckedChange = onWaveform,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor   = UiText,
+                    checkedTrackColor   = UiAccent,
+                    uncheckedThumbColor = UiSubtle,
+                    uncheckedTrackColor = UiSubtle.copy(alpha = 0.3f)
+                )
+            )
         }
     }
 }
 
-// ── Reusable setting card ─────────────────────────────────────────────────────
+// ── Shared composables ────────────────────────────────────────────────────────
 
 @Composable
-private fun SettingCard(
+fun SettingCard(
     label:    String,
-    subLabel: String,
+    subtitle: String,
     value:    String,
     unit:     String,
     content:  @Composable ColumnScope.() -> Unit
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth()
+        Modifier.fillMaxWidth()
             .background(BgCard, RoundedCornerShape(16.dp))
             .padding(20.dp)
     ) {
-        Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.Bottom) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(label, color = UiSubtle, fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
-                Spacer(Modifier.height(3.dp))
-                Text(subLabel, color = UiText, fontSize = 11.sp,
+                Spacer(Modifier.height(2.dp))
+                Text(subtitle, color = UiText, fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace)
             }
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.End) {
-                Text(value, color = UiAccent, fontSize = 38.sp,
-                    fontWeight = FontWeight.ExtraBold, fontFamily = FontFamily.Monospace,
-                    lineHeight = 38.sp)
+                Text(value, color = UiAccent, fontSize = 18.sp,
+                    fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                 if (unit.isNotEmpty())
-                    Text(unit, color = UiSubtle, fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace, letterSpacing = 2.sp)
+                    Text(unit, color = UiSubtle, fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.align(Alignment.End))
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -912,25 +747,47 @@ private fun SettingCard(
 }
 
 @Composable
-private fun SliderLabels(min: String, max: String) {
+fun SliderLabels(start: String, end: String) {
     Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-        Text(min, color = UiSubtle, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-        Text(max, color = UiSubtle, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+        Text(start, color = UiSubtle, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+        Text(end,   color = UiSubtle, fontSize = 9.sp, fontFamily = FontFamily.Monospace,
+            modifier = Modifier.weight(1f), textAlign = TextAlign.End)
     }
 }
 
-// ── Formatters ────────────────────────────────────────────────────────────────
+@Composable
+private fun ColorSchemeButton(
+    label:    String,
+    gradient: List<Color>,
+    selected: Boolean,
+    modifier: Modifier,
+    onClick:  () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (selected) UiAccent.copy(alpha = 0.15f) else Color.Transparent)
+            .border(1.dp,
+                if (selected) UiAccent else UiSubtle.copy(alpha = 0.35f),
+                RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp, horizontal = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50))
+            .background(Brush.horizontalGradient(gradient)))
+        Spacer(Modifier.height(6.dp))
+        Text(label, color = if (selected) UiAccent else UiSubtle,
+            fontSize = 10.sp, fontFamily = FontFamily.Monospace,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+    }
+}
 
-private fun formatBandHz(hz: Float): String =
-    if (hz >= 1000f) "${"%.1f".format(hz / 1000f)} kHz" else "${hz.roundToInt()} Hz"
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 private fun formatMs(ms: Long): String =
-    if (ms >= 1000L) "${"%.1f".format(ms / 1000f)} s" else "${ms} ms"
+    if (ms >= 1000L) "${"%.1f".format(ms / 1000.0)}s" else "${ms}ms"
 
 private fun placementLabel(v: Float): String = when {
-    v < 0.15f -> "Grid"
-    v < 0.40f -> "Slight"
-    v < 0.65f -> "Medium"
-    v < 0.85f -> "High"
-    else       -> "Full"
+    v < 0.1f -> "Grid"; v < 0.4f -> "Slight"; v < 0.7f -> "Mixed"; else -> "Random"
 }
