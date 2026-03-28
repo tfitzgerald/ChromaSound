@@ -1,8 +1,8 @@
 package com.chromasound.app
 
 import android.Manifest
-import android.app.Activity
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -11,12 +11,10 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.chromasound.app.ui.ChromaSoundScreen
@@ -29,20 +27,26 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // ── All window configuration runs ONCE here in onCreate ───────────────
+        // Never touch the window inside a Compose SideEffect — it fires on every
+        // recomposition (30–60 times/sec during audio capture) and causes flicker.
+
+        // Keep screen on for the lifetime of this activity
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        // Edge-to-edge display — let content draw behind status/nav bars
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        setContent {
-            val view = LocalView.current
-            SideEffect {
-                val win = (view.context as? Activity)?.window ?: return@SideEffect
-                WindowInsetsControllerCompat(win, view).apply {
-                    isAppearanceLightStatusBars     = false
-                    isAppearanceLightNavigationBars = false
-                }
-                win.statusBarColor     = android.graphics.Color.TRANSPARENT
-                win.navigationBarColor = android.graphics.Color.TRANSPARENT
-            }
+        // Transparent status and navigation bars with dark icons off (light content)
+        window.statusBarColor     = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            isAppearanceLightStatusBars     = false
+            isAppearanceLightNavigationBars = false
+        }
 
+        setContent {
             Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF050508)) {
                 val uiState  by viewModel.uiState.collectAsState()
                 val settings by viewModel.settings.collectAsState()

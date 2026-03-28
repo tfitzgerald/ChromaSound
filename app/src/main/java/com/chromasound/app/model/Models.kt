@@ -32,9 +32,11 @@ data class Settings(
     val colorScheme:    ColorScheme      = ColorScheme.RAINBOW,
     val objectShape:    ObjectShape      = ObjectShape.CIRCLE,
     val subBands:       Int              = 4,
-    // Per-band color overrides. Key = band index (0-based).
-    // If a band has no entry the automatic color scheme is used instead.
-    val bandColors:     Map<Int, Color>  = emptyMap()
+    val bandColors:     Map<Int, Color>  = emptyMap(),
+    // Noise gate: minimum dBFS a band must reach to spawn a shape.
+    // Lower values = more sensitive (quiet sounds trigger shapes).
+    // Higher values = only louder sounds trigger shapes.
+    val noiseGateDb:    Float            = -50f
 ) {
     companion object {
         const val MIN_LIFETIME_MS      = 100L
@@ -51,6 +53,9 @@ data class Settings(
         const val MAX_SENSITIVITY      = 3.0f
         const val MIN_SUB_BANDS        = 1
         const val MAX_SUB_BANDS        = 12
+        const val MIN_NOISE_GATE_DB    = -70f   // very sensitive
+        const val MAX_NOISE_GATE_DB    = -20f   // only loud sounds
+        const val DEFAULT_NOISE_GATE_DB = -50f
     }
 }
 

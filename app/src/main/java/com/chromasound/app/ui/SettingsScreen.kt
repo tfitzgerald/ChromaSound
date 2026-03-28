@@ -51,6 +51,7 @@ fun SettingsScreen(
     var colorScheme    by remember { mutableStateOf(currentSettings.colorScheme) }
     var objectShape    by remember { mutableStateOf(currentSettings.objectShape) }
     var subBands       by remember { mutableStateOf(currentSettings.subBands.toFloat()) }
+    var noiseGateDb    by remember { mutableStateOf(currentSettings.noiseGateDb) }
 
     fun emit() = onSettingsChange(Settings(
         bandCount      = bandCount.roundToInt(),
@@ -62,7 +63,8 @@ fun SettingsScreen(
         sensitivity    = sensitivity,
         colorScheme    = colorScheme,
         objectShape    = objectShape,
-        subBands       = subBands.roundToInt()
+        subBands       = subBands.roundToInt(),
+        noiseGateDb    = noiseGateDb
     ))
 
     val bands     = remember(bandCount.roundToInt()) { BandDefinition.build(bandCount.roundToInt()) }
@@ -200,6 +202,22 @@ fun SettingsScreen(
                     valueRange = Settings.MIN_SENSITIVITY..Settings.MAX_SENSITIVITY,
                     colors = sliderColors, modifier = Modifier.fillMaxWidth())
                 SliderLabels("×${"%.1f".format(Settings.MIN_SENSITIVITY)} low", "×${"%.1f".format(Settings.MAX_SENSITIVITY)} high")
+            }
+            Spacer(Modifier.height(14.dp))
+        }
+
+        // ── 7b. Noise gate ────────────────────────────────────────────────────
+        item {
+            SettingCard("NOISE GATE", "Minimum level a band must reach to appear",
+                value = "${noiseGateDb.roundToInt()} dB", unit = "threshold") {
+                Slider(value = noiseGateDb,
+                    onValueChange = { noiseGateDb = it; emit() },
+                    valueRange = Settings.MIN_NOISE_GATE_DB..Settings.MAX_NOISE_GATE_DB,
+                    colors = sliderColors, modifier = Modifier.fillMaxWidth())
+                SliderLabels(
+                    "${Settings.MIN_NOISE_GATE_DB.roundToInt()} dB  very sensitive",
+                    "${Settings.MAX_NOISE_GATE_DB.roundToInt()} dB  loud only"
+                )
             }
             Spacer(Modifier.height(14.dp))
         }

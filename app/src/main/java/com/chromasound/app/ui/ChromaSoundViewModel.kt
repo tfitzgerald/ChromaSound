@@ -1,16 +1,19 @@
 package com.chromasound.app.ui
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.content.Context
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.chromasound.app.audio.AudioCaptureEngine
 import com.chromasound.app.audio.AudioCaptureEngine.Companion.DB_FLOOR
-import com.chromasound.app.audio.AudioCaptureEngine.Companion.DB_SPAWN_THRESHOLD
 import com.chromasound.app.audio.AudioCaptureEngine.Companion.FFT_SIZE
 import com.chromasound.app.audio.AudioCaptureEngine.Companion.SAMPLE_RATE
 import com.chromasound.app.fft.FrequencyColorMapper
 import com.chromasound.app.model.AudioFrame
 import com.chromasound.app.model.BandDefinition
+import com.chromasound.app.model.ColorScheme
 import com.chromasound.app.model.FrequencyCircle
+import com.chromasound.app.model.ObjectShape
 import com.chromasound.app.model.Settings
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,7 +41,11 @@ sealed interface ChromaSoundUiState {
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
 
-class ChromaSoundViewModel : ViewModel() {
+/**
+ * Now extends AndroidViewModel to access SharedPreferences for settings persistence.
+ * All settings are saved to disk on every change and restored on startup.
+ */
+class ChromaSoundViewModel(application: Application) : AndroidViewModel(application) {
 
     private val engine = AudioCaptureEngine()
 
@@ -55,13 +62,23 @@ class ChromaSoundViewModel : ViewModel() {
 
     private var captureJob: Job? = null
 
+    // SharedPreferences key for settings persistence
+    private val prefs = application.getSharedPreferences("chromasound_settings", Context.MODE_PRIVATE)
+
+    init {
+        // Load persisted settings on startup
+        _settings.value = loadSettings()
+        currentBands = BandDefinition.build(_settings.value.bandCount)
+        bandSlots    = Array(_settings.value.bandCount) { arrayOfNulls(_settings.value.circlesPerBand) }
+    }
+
     companion object {
         fun formatHz(hz: Float) =
             if (hz >= 1000f) "${"%.1f".format(hz / 1000f)} kHz" else "${hz.toInt()} Hz"
 
-        fun dbToRadius(db: Float, minPx: Float, maxPx: Float): Float {
-            val range      = 0f - DB_SPAWN_THRESHOLD
-            val normalized = (db - DB_SPAWN_THRESHOLD) / range
+        fun dbToRadius(db: Float, minPx: Float, maxPx: Float, noiseGateDb: Float): Float {
+            val range      = 0f - noiseGateDb
+            val normalized = (db - noiseGateDb) / range
             return (minPx + normalized.coerceIn(0f, 1f) * (maxPx - minPx))
         }
 
@@ -80,6 +97,53 @@ class ChromaSoundViewModel : ViewModel() {
         }
     }
 
+    // ── Settings persistence ──────────────────────────────────────────────────
+
+    private fun saveSettings(s: Settings) {
+        prefs.edit().apply {
+            putInt("bandCount",       s.bandCount)
+            putLong("lifetimeMs",     s.lifetimeMs)
+            putInt("circlesPerBand",  s.circlesPerBand)
+            putFloat("minRadiusPx",   s.minRadiusPx)
+            putFloat("maxRadiusPx",   s.maxRadiusPx)
+            putFloat("placement",     s.placement)
+            putFloat("sensitivity",   s.sensitivity)
+            putString("colorScheme",  s.colorScheme.name)
+            putString("objectShape",  s.objectShape.name)
+            putInt("subBands",        s.subBands)
+            putFloat("noiseGateDb",   s.noiseGateDb)
+            // Note: bandColors (Map<Int,Color>) are not persisted — they reset on restart.
+            // Full persistence of custom band colours will be added in a future build.
+            apply()
+        }
+    }
+
+    private fun loadSettings(): Settings {
+        val defaults = Settings()
+        return try {
+            Settings(
+                bandCount      = prefs.getInt("bandCount",      defaults.bandCount),
+                lifetimeMs     = prefs.getLong("lifetimeMs",    defaults.lifetimeMs),
+                circlesPerBand = prefs.getInt("circlesPerBand", defaults.circlesPerBand),
+                minRadiusPx    = prefs.getFloat("minRadiusPx",  defaults.minRadiusPx),
+                maxRadiusPx    = prefs.getFloat("maxRadiusPx",  defaults.maxRadiusPx),
+                placement      = prefs.getFloat("placement",    defaults.placement),
+                sensitivity    = prefs.getFloat("sensitivity",  defaults.sensitivity),
+                colorScheme    = try {
+                    ColorScheme.valueOf(prefs.getString("colorScheme", defaults.colorScheme.name) ?: defaults.colorScheme.name)
+                } catch (_: Exception) { defaults.colorScheme },
+                objectShape    = try {
+                    ObjectShape.valueOf(prefs.getString("objectShape", defaults.objectShape.name) ?: defaults.objectShape.name)
+                } catch (_: Exception) { defaults.objectShape },
+                subBands       = prefs.getInt("subBands",       defaults.subBands),
+                noiseGateDb    = prefs.getFloat("noiseGateDb",  defaults.noiseGateDb),
+                bandColors     = emptyMap()   // reset on every launch
+            )
+        } catch (_: Exception) {
+            defaults  // fall back to defaults if prefs are corrupt
+        }
+    }
+
     // ── Settings API ──────────────────────────────────────────────────────────
 
     fun updateSettings(new: Settings) {
@@ -92,10 +156,12 @@ class ChromaSoundViewModel : ViewModel() {
                 .coerceAtLeast(new.minRadiusPx + 10f),
             placement      = new.placement.coerceIn(Settings.MIN_PLACEMENT, Settings.MAX_PLACEMENT),
             sensitivity    = new.sensitivity.coerceIn(Settings.MIN_SENSITIVITY, Settings.MAX_SENSITIVITY),
-            subBands       = new.subBands.coerceIn(Settings.MIN_SUB_BANDS, Settings.MAX_SUB_BANDS)
-            // bandColors: no clamping needed, pass through directly
+            subBands       = new.subBands.coerceIn(Settings.MIN_SUB_BANDS, Settings.MAX_SUB_BANDS),
+            noiseGateDb    = new.noiseGateDb.coerceIn(Settings.MIN_NOISE_GATE_DB, Settings.MAX_NOISE_GATE_DB)
         ).let { it.copy(bandColors = new.bandColors) }
+
         _settings.value = s
+        saveSettings(s)   // persist to disk immediately
 
         if (s.bandCount != currentBands.count) {
             currentBands = BandDefinition.build(s.bandCount)
@@ -114,7 +180,8 @@ class ChromaSoundViewModel : ViewModel() {
             engine.audioFrameFlow(
                 bands       = { currentBands },
                 sensitivity = { _settings.value.sensitivity },
-                subBands    = { _settings.value.subBands }
+                subBands    = { _settings.value.subBands },
+                noiseGate   = { _settings.value.noiseGateDb }
             )
                 .catch { _uiState.value = ChromaSoundUiState.Idle }
                 .collect { frame -> processFrame(frame) }
@@ -166,7 +233,6 @@ class ChromaSoundViewModel : ViewModel() {
             val y = computeY(s.placement)
             val x = computeX(band, bd.count, s.placement)
 
-            // Retrieve sub-band energies for this band from the audio frame
             val subEnergies = if (band < frame.bandSubEnergies.size)
                 frame.bandSubEnergies[band]
             else
@@ -177,7 +243,7 @@ class ChromaSoundViewModel : ViewModel() {
                 slotIndex       = targetSlot,
                 x               = x,
                 y               = y,
-                radiusPx        = dbToRadius(db, s.minRadiusPx, s.maxRadiusPx),
+                radiusPx        = dbToRadius(db, s.minRadiusPx, s.maxRadiusPx, s.noiseGateDb),
                 color           = FrequencyColorMapper.colorForBand(band, centreHz, s.colorScheme, s.bandColors),
                 spawnTimeMs     = nowMs,
                 lifetimeMs      = s.lifetimeMs,

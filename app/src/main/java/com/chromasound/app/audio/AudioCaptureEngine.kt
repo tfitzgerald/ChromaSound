@@ -32,11 +32,13 @@ class AudioCaptureEngine {
      * @param bands       Current [BandDefinition] — read each frame.
      * @param sensitivity dB gain multiplier — read each frame.
      * @param subBands    Number of sub-bands per band for shading — read each frame.
+     * @param noiseGate   Minimum dBFS threshold for spawning a shape — read each frame.
      */
     fun audioFrameFlow(
         bands:       () -> BandDefinition,
         sensitivity: () -> Float,
-        subBands:    () -> Int
+        subBands:    () -> Int,
+        noiseGate:   () -> Float
     ): Flow<AudioFrame> = flow {
 
         val minBuf     = AudioRecord.getMinBufferSize(
@@ -89,14 +91,16 @@ class AudioCaptureEngine {
                     (rawDb[i] * gain).coerceIn(DB_FLOOR, 0f)
                 }
 
+                // Per-band peak bin — use the user-adjustable noise gate threshold
                 val bd  = bands()
                 val nsb = subBands().coerceIn(1, 12)
+                val threshold = noiseGate().coerceIn(DB_FLOOR, 0f)
 
                 // ── Per-band peak bin ─────────────────────────────────────────
                 val bandPeakBins = IntArray(bd.count) { -1 }
 
                 if (rms > SILENCE_THRESHOLD) {
-                    val bandPeakDb = FloatArray(bd.count) { DB_SPAWN_THRESHOLD }
+                    val bandPeakDb = FloatArray(bd.count) { threshold }
                     for (bin in 1 until magnitudes.size) {
                         val hz   = bin.toFloat() * SAMPLE_RATE / FFT_SIZE.toFloat()
                         val band = bd.bandFor(hz)
