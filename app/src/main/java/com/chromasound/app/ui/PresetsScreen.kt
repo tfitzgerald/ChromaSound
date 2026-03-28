@@ -298,6 +298,7 @@ fun PresetsScreen(
         it.addAll(loadPresets(context))
     }}
     var showSaveDialog    by remember { mutableStateOf(false) }
+    var showPasteDialog   by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf<Int?>(null) }
 
     fun deletePreset(index: Int) {
@@ -354,6 +355,41 @@ fun PresetsScreen(
                 ) {
                     Text("+ SAVE", fontFamily = FontFamily.Monospace,
                         fontSize = 11.sp, letterSpacing = 2.sp)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            // Share Current + Paste Code action row
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        val code = encodePreset(currentSettings.toPreset("Current"))
+                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(android.content.Intent.EXTRA_TEXT,
+                                "My ChromaSound preset:\n$code")
+                        }
+                        context.startActivity(android.content.Intent.createChooser(
+                            intent, "Share preset code"))
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = UiAccent),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, UiAccent.copy(alpha = 0.5f)),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                ) {
+                    Text("↑ SHARE CURRENT", fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp, letterSpacing = 1.sp)
+                }
+                OutlinedButton(
+                    onClick = { showPasteDialog = true },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = UiSubtle),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, UiSubtle.copy(alpha = 0.5f)),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                ) {
+                    Text("↓ PASTE CODE", fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp, letterSpacing = 1.sp)
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -419,10 +455,20 @@ fun PresetsScreen(
         // ── Saved preset cards ────────────────────────────────────────────────
         itemsIndexed(presets) { index, preset ->
             PresetCard(
-                preset  = preset,
-                onLoad  = {
+                preset   = preset,
+                onLoad   = {
                     onApplySettings(preset.toSettings(currentSettings))
                     onClose()
+                },
+                onShare  = {
+                    val code = encodePreset(preset)
+                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(android.content.Intent.EXTRA_TEXT,
+                            "My ChromaSound preset \"${preset.name}\":\n$code")
+                    }
+                    context.startActivity(android.content.Intent.createChooser(
+                        intent, "Share preset"))
                 },
                 onDelete = { showDeleteConfirm = index }
             )
@@ -437,6 +483,21 @@ fun PresetsScreen(
         SavePresetDialog(
             onSave    = { name -> savePreset(name); showSaveDialog = false },
             onDismiss = { showSaveDialog = false }
+        )
+    }
+
+    // ── Paste code dialog ─────────────────────────────────────────────────────
+    if (showPasteDialog) {
+        PasteCodeDialog(
+            onApply = { code ->
+                val decoded = decodePreset(code)
+                if (decoded != null) {
+                    onApplySettings(decoded.toSettings(currentSettings))
+                    showPasteDialog = false
+                    onClose()
+                }
+            },
+            onDismiss = { showPasteDialog = false }
         )
     }
 
@@ -497,38 +558,63 @@ private fun ThemeCard(theme: Theme, onClick: () -> Unit) {
 // ── Saved preset card ─────────────────────────────────────────────────────────
 
 @Composable
-private fun PresetCard(preset: NamedPreset, onLoad: () -> Unit, onDelete: () -> Unit) {
-    Row(
+private fun PresetCard(
+    preset:   NamedPreset,
+    onLoad:   () -> Unit,
+    onShare:  () -> Unit,
+    onDelete: () -> Unit
+) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(BgCard)
-            .clickable(onClick = onLoad)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.size(40.dp)
-            .background(UiAccent.copy(alpha = 0.12f), RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center) {
-            Text(shapeEmoji(preset.objectShape), fontSize = 18.sp)
-        }
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(preset.name, color = UiText, fontSize = 14.sp,
+        // Main tap-to-load row
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onLoad).padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(Modifier.size(40.dp)
+                .background(UiAccent.copy(alpha = 0.12f), RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center) {
+                Text(shapeEmoji(preset.objectShape), fontSize = 18.sp)
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(preset.name, color = UiText, fontSize = 14.sp,
+                    fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(3.dp))
+                Text(presetSummary(preset), color = UiSubtle, fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.width(8.dp))
+            Text("LOAD →", color = UiAccent, fontSize = 10.sp,
                 fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(3.dp))
-            Text(presetSummary(preset), color = UiSubtle, fontSize = 10.sp,
-                fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                letterSpacing = 1.sp)
         }
-        Spacer(Modifier.width(8.dp))
-        Text("LOAD →", color = UiAccent, fontSize = 10.sp,
-            fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-        Spacer(Modifier.width(12.dp))
-        TextButton(onClick = onDelete,
-            contentPadding = PaddingValues(4.dp),
-            modifier = Modifier.size(32.dp)) {
-            Text("✕", color = UiSubtle, fontSize = 14.sp)
+        // Share + Delete action row
+        HorizontalDivider(color = UiSubtle.copy(alpha = 0.12f), thickness = 1.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(
+                onClick = onShare,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
+            ) {
+                Text("↑ Share", color = UiAccent, fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+            }
+            TextButton(
+                onClick = onDelete,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
+            ) {
+                Text("✕ Delete", color = UiSubtle, fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace)
+            }
         }
     }
 }
@@ -573,6 +659,66 @@ private fun SavePresetDialog(onSave: (String) -> Unit, onDismiss: () -> Unit) {
                     colors = ButtonDefaults.buttonColors(containerColor = UiAccent,
                         disabledContainerColor = UiSubtle.copy(alpha = 0.3f))) {
                     Text("SAVE", fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                }
+            }
+        }
+    }
+}
+
+
+// ── Paste code dialog ─────────────────────────────────────────────────────────
+
+@Composable
+private fun PasteCodeDialog(onApply: (String) -> Unit, onDismiss: () -> Unit) {
+    var code       by remember { mutableStateOf("") }
+    var errorMsg   by remember { mutableStateOf("") }
+    Dialog(onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth()
+            .background(BgCard, RoundedCornerShape(16.dp)).padding(24.dp)) {
+            Text("PASTE PRESET CODE", color = UiText, fontSize = 16.sp,
+                fontFamily = FontFamily.Monospace, fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 2.sp)
+            Spacer(Modifier.height(6.dp))
+            Text("Paste a CS: code shared by another user",
+                color = UiSubtle, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+            Spacer(Modifier.height(16.dp))
+            OutlinedTextField(
+                value = code, onValueChange = { code = it; errorMsg = "" },
+                placeholder = { Text("CS:...", color = UiSubtle,
+                    fontFamily = FontFamily.Monospace, fontSize = 12.sp) },
+                singleLine = false, minLines = 2, modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor   = UiAccent, unfocusedBorderColor = UiSubtle,
+                    focusedTextColor     = UiText,   unfocusedTextColor   = UiText,
+                    cursorColor          = UiAccent),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+            )
+            if (errorMsg.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text(errorMsg, color = Color(0xFFFF6B6B), fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace)
+            }
+            Spacer(Modifier.height(20.dp))
+            Row(Modifier.fillMaxWidth(), Arrangement.End, Alignment.CenterVertically) {
+                TextButton(onClick = onDismiss) {
+                    Text("CANCEL", color = UiSubtle, fontFamily = FontFamily.Monospace) }
+                Spacer(Modifier.width(12.dp))
+                Button(
+                    onClick = {
+                        val trimmed = code.trim()
+                        if (decodePreset(trimmed) != null) {
+                            onApply(trimmed)
+                        } else {
+                            errorMsg = "Invalid code — make sure you copied the full CS:... text"
+                        }
+                    },
+                    enabled = code.isNotBlank(), shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(containerColor = UiAccent,
+                        disabledContainerColor = UiSubtle.copy(alpha = 0.3f))
+                ) {
+                    Text("APPLY", fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                 }
             }
