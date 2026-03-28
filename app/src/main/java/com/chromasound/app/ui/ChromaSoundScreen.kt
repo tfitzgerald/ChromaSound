@@ -463,12 +463,29 @@ private fun VisualizerCanvas(
             // which requires a dark background to glow correctly.
             BackgroundEffect.BLOOM -> {
                 drawRect(color = Color(0xFF050508))
-                // Amplify RMS heavily — raw values are 0.002–0.05 so we need 20x to see anything
-                val bloom = (rmsVolume * 20f).coerceIn(0f, 1f) * 0.18f
+                // Boost RMS heavily — raw values 0.002–0.05 need strong amplification
+                // Use a power curve so quiet sounds still show some bloom
+                val rmsAmp = (rmsVolume * 30f).coerceIn(0f, 1f)
+                val bloom  = rmsAmp.let { it * it }.coerceIn(0f, 1f)  // power curve
+
+                // Layer 1: wide soft glow covering the whole screen
                 drawRect(brush = Brush.radialGradient(
-                    listOf(Color(0xFF7C6FFF).copy(alpha = bloom), Color.Transparent),
+                    listOf(
+                        Color(0xFF7C6FFF).copy(alpha = bloom * 0.55f),
+                        Color(0xFF2A1F8F).copy(alpha = bloom * 0.25f),
+                        Color.Transparent
+                    ),
                     center = Offset(w * 0.5f, h * 0.5f),
-                    radius = w * 0.8f
+                    radius = maxOf(w, h) * 0.9f
+                ))
+                // Layer 2: bright hot centre that really punches on loud moments
+                drawRect(brush = Brush.radialGradient(
+                    listOf(
+                        Color(0xFFB8AAFF).copy(alpha = bloom * 0.45f),
+                        Color.Transparent
+                    ),
+                    center = Offset(w * 0.5f, h * 0.5f),
+                    radius = w * 0.35f
                 ))
             }
             BackgroundEffect.NOISE -> {
