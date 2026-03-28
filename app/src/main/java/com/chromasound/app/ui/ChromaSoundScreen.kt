@@ -39,12 +39,13 @@ private val UiSubtle = Color(0xFF5A5870)
 // ── Root ──────────────────────────────────────────────────────────────────────
 @Composable
 fun ChromaSoundScreen(
-    uiState:          ChromaSoundUiState,
-    settings:         Settings,
-    waveformSamples:  List<Float>,
-    onStartRequested: () -> Unit,
-    onStopRequested:  () -> Unit,
-    onSettingsChange: (Settings) -> Unit
+    uiState:               ChromaSoundUiState,
+    settings:              Settings,
+    waveformSamples:       List<Float>,
+    onStartRequested:      () -> Unit,
+    onStopRequested:       () -> Unit,
+    onSettingsChange:      (Settings) -> Unit,
+    onScreenshotRequested: () -> Unit = {}
 ) {
     var showSettings   by remember { mutableStateOf(false) }
     var showBandColors by remember { mutableStateOf(false) }
@@ -88,7 +89,8 @@ fun ChromaSoundScreen(
                         showWaveform    = settings.showWaveform,
                         waveformSamples = waveformSamples,
                         onStop          = onStopRequested,
-                        onSettings      = { showSettings = true }
+                        onSettings      = { showSettings = true },
+                        onScreenshot    = onScreenshotRequested
                     )
                 ChromaSoundUiState.PermissionDenied -> PermissionDeniedScreen()
                 else -> IdleScreen(onStartRequested)
@@ -149,7 +151,8 @@ private fun RunningScreen(
     showWaveform:    Boolean,
     waveformSamples: List<Float>,
     onStop:          () -> Unit,
-    onSettings:      () -> Unit
+    onSettings:      () -> Unit,
+    onScreenshot:    () -> Unit
 ) {
     Box(Modifier.fillMaxSize()) {
         VisualizerCanvas(
@@ -175,15 +178,28 @@ private fun RunningScreen(
             modifier    = Modifier.fillMaxWidth().align(Alignment.TopCenter)
                 .padding(top = 52.dp, start = 20.dp, end = 20.dp)
         )
-        OutlinedButton(
-            onClick = onStop,
+        Row(
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 52.dp),
-            shape = RoundedCornerShape(50),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = UiText),
-            border = androidx.compose.foundation.BorderStroke(1.dp, UiSubtle)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("■  STOP", fontFamily = FontFamily.Monospace,
-                letterSpacing = 3.sp, fontSize = 12.sp)
+            OutlinedButton(
+                onClick = onStop,
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = UiText),
+                border = androidx.compose.foundation.BorderStroke(1.dp, UiSubtle)
+            ) {
+                Text("■  STOP", fontFamily = FontFamily.Monospace,
+                    letterSpacing = 3.sp, fontSize = 12.sp)
+            }
+            OutlinedButton(
+                onClick = onScreenshot,
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = UiAccent),
+                border = androidx.compose.foundation.BorderStroke(1.dp, UiAccent.copy(alpha = 0.5f))
+            ) {
+                Text("📷", fontSize = 16.sp)
+            }
         }
     }
 }
@@ -272,8 +288,8 @@ private fun VisualizerCanvas(
 
         // ── 3. Waveform overlay ───────────────────────────────────────────────
         if (showWaveform && waveformSamples.size > 1) {
-            val waveH    = h * 0.15f             // 15% of screen height
-            val waveMid  = h - waveH * 0.5f - h * 0.06f  // centre line Y
+            val waveH    = h * 1.5f              // full screen height (×10 of original 15%)
+            val waveMid  = h * 0.5f              // centre of screen
             val stepX    = w / (waveformSamples.size - 1).toFloat()
             // Glow pass — wide soft halo
             for (i in 0 until waveformSamples.size - 1) {
