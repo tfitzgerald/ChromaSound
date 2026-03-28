@@ -57,6 +57,8 @@ fun SettingsScreen(
     var mirrorMode      by remember { mutableStateOf(currentSettings.mirrorMode) }
     var trailLength     by remember { mutableStateOf(currentSettings.trailLength.toFloat()) }
     var beatSensitivity by remember { mutableStateOf(currentSettings.beatSensitivity) }
+    var colorAnimSpeed  by remember { mutableStateOf(currentSettings.colorAnimSpeed) }
+    var showWaveform    by remember { mutableStateOf(currentSettings.showWaveform) }
 
     fun emit() = onSettingsChange(Settings(
         bandCount      = bandCount.roundToInt(),
@@ -72,7 +74,9 @@ fun SettingsScreen(
         noiseGateDb    = noiseGateDb,
         mirrorMode      = mirrorMode,
         trailLength     = trailLength.roundToInt(),
-        beatSensitivity = beatSensitivity
+        beatSensitivity = beatSensitivity,
+        colorAnimSpeed  = colorAnimSpeed,
+        showWaveform    = showWaveform
     ))
 
     val bands     = remember(bandCount.roundToInt()) { BandDefinition.build(bandCount.roundToInt()) }
@@ -124,6 +128,27 @@ fun SettingsScreen(
             Spacer(Modifier.height(28.dp))
         }
 
+
+        // ── SECTION: FREQUENCY & TIMING ──────────────────────────────────────────
+        item {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.weight(1f).height(1.dp).background(
+                    Brush.horizontalGradient(listOf(Color.Transparent, UiAccent.copy(alpha=0.3f)))
+                ))
+                Text("  FREQUENCY & TIMING  ", color = UiAccent.copy(alpha=0.8f), fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp)
+                Box(Modifier.weight(1f).height(1.dp).background(
+                    Brush.horizontalGradient(listOf(UiAccent.copy(alpha=0.3f), Color.Transparent))
+                ))
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
         // ── 1. Frequency bands ────────────────────────────────────────────────
         item {
             SettingCard("FREQUENCY BANDS", "30 Hz  –  11 kHz",
@@ -161,6 +186,27 @@ fun SettingsScreen(
                 SliderLabels("${Settings.MIN_CIRCLES_PER_BAND}", "${Settings.MAX_CIRCLES_PER_BAND}")
             }
             Spacer(Modifier.height(14.dp))
+        }
+
+
+        // ── SECTION: SIZE & POSITION ──────────────────────────────────────────
+        item {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.weight(1f).height(1.dp).background(
+                    Brush.horizontalGradient(listOf(Color.Transparent, UiAccent.copy(alpha=0.3f)))
+                ))
+                Text("  SIZE & POSITION  ", color = UiAccent.copy(alpha=0.8f), fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp)
+                Box(Modifier.weight(1f).height(1.dp).background(
+                    Brush.horizontalGradient(listOf(UiAccent.copy(alpha=0.3f), Color.Transparent))
+                ))
+            }
+            Spacer(Modifier.height(8.dp))
         }
 
         // ── 4. Minimum circle size ────────────────────────────────────────────
@@ -202,6 +248,27 @@ fun SettingsScreen(
             Spacer(Modifier.height(14.dp))
         }
 
+
+        // ── SECTION: AUDIO ──────────────────────────────────────────
+        item {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.weight(1f).height(1.dp).background(
+                    Brush.horizontalGradient(listOf(Color.Transparent, UiAccent.copy(alpha=0.3f)))
+                ))
+                Text("  AUDIO  ", color = UiAccent.copy(alpha=0.8f), fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp)
+                Box(Modifier.weight(1f).height(1.dp).background(
+                    Brush.horizontalGradient(listOf(UiAccent.copy(alpha=0.3f), Color.Transparent))
+                ))
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
         // ── 7. Microphone sensitivity ─────────────────────────────────────────
         item {
             SettingCard("MIC SENSITIVITY", "Amplify or reduce response to incoming audio",
@@ -228,6 +295,27 @@ fun SettingsScreen(
                 )
             }
             Spacer(Modifier.height(14.dp))
+        }
+
+
+        // ── SECTION: VISUAL ──────────────────────────────────────────
+        item {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.weight(1f).height(1.dp).background(
+                    Brush.horizontalGradient(listOf(Color.Transparent, UiAccent.copy(alpha=0.3f)))
+                ))
+                Text("  VISUAL  ", color = UiAccent.copy(alpha=0.8f), fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp)
+                Box(Modifier.weight(1f).height(1.dp).background(
+                    Brush.horizontalGradient(listOf(UiAccent.copy(alpha=0.3f), Color.Transparent))
+                ))
+            }
+            Spacer(Modifier.height(8.dp))
         }
 
         // ── 8. Sub-band shading ───────────────────────────────────────────────
@@ -335,6 +423,27 @@ fun SettingsScreen(
             Spacer(Modifier.height(24.dp))
         }
 
+
+        // ── SECTION: EFFECTS ──────────────────────────────────────────
+        item {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.weight(1f).height(1.dp).background(
+                    Brush.horizontalGradient(listOf(Color.Transparent, UiAccent.copy(alpha=0.3f)))
+                ))
+                Text("  EFFECTS  ", color = UiAccent.copy(alpha=0.8f), fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp)
+                Box(Modifier.weight(1f).height(1.dp).background(
+                    Brush.horizontalGradient(listOf(UiAccent.copy(alpha=0.3f), Color.Transparent))
+                ))
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
         // ── Mirror mode ───────────────────────────────────────────────────────
         item {
             val modes = MirrorMode.entries.toList()
@@ -426,6 +535,59 @@ fun SettingsScreen(
                     modifier      = Modifier.fillMaxWidth()
                 )
                 SliderLabels("×1.1  very sensitive", "×2.5  hard hits only")
+            }
+            Spacer(Modifier.height(14.dp))
+        }
+
+        // ── Colour animation speed ────────────────────────────────────────────
+        item {
+            SettingCard(
+                "COLOUR ANIMATION",
+                "Hue cycles continuously over time",
+                value = if (colorAnimSpeed == 0f) "Off" else "${"%.1f".format(colorAnimSpeed)}×",
+                unit  = if (colorAnimSpeed == 0f) "" else "speed"
+            ) {
+                Slider(
+                    value         = colorAnimSpeed,
+                    onValueChange = { colorAnimSpeed = it; emit() },
+                    valueRange    = Settings.MIN_COLOR_ANIM_SPEED..Settings.MAX_COLOR_ANIM_SPEED,
+                    colors        = sliderColors,
+                    modifier      = Modifier.fillMaxWidth()
+                )
+                SliderLabels("Off", "3× fast")
+            }
+            Spacer(Modifier.height(14.dp))
+        }
+
+        // ── Waveform overlay toggle ───────────────────────────────────────────
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .background(BgCard, RoundedCornerShape(16.dp))
+                    .padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("WAVEFORM OVERLAY", color = UiSubtle, fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        if (showWaveform) "Scrolling audio waveform visible"
+                        else "Waveform hidden",
+                        color = UiText, fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                Switch(
+                    checked         = showWaveform,
+                    onCheckedChange = { showWaveform = it; emit() },
+                    colors          = SwitchDefaults.colors(
+                        checkedThumbColor   = UiText,
+                        checkedTrackColor   = UiAccent,
+                        uncheckedThumbColor = UiSubtle,
+                        uncheckedTrackColor = UiSubtle.copy(alpha = 0.3f)
+                    )
+                )
             }
             Spacer(Modifier.height(14.dp))
         }
@@ -562,7 +724,7 @@ fun SettingsScreen(
             }
             Spacer(Modifier.height(20.dp))
             Text(
-                "ChromaSound  ·  Version 1.4.0",
+                "ChromaSound  ·  Version 1.5.0",
                 color = UiSubtle.copy(alpha = 0.6f),
                 fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace,

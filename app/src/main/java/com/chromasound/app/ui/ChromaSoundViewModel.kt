@@ -31,14 +31,15 @@ sealed interface ChromaSoundUiState {
     data object RequestingPermission : ChromaSoundUiState
     data object PermissionDenied     : ChromaSoundUiState
     data class Running(
-        val circles:     List<FrequencyCircle> = emptyList(),
-        val rmsVolume:   Float = 0f,
-        val activeCount: Int   = 0,
-        val bandCount:   Int   = BandDefinition.DEFAULT_BANDS,
-        val peakHz:      String = "",
-        val peakDb:      String = "",
-        val bpm:         Float  = 0f,
-        val beatPulseMs: Long   = 0L   // timestamp of last beat — used to drive pulse animation
+        val circles:        List<FrequencyCircle> = emptyList(),
+        val rmsVolume:      Float  = 0f,
+        val activeCount:    Int    = 0,
+        val bandCount:      Int    = BandDefinition.DEFAULT_BANDS,
+        val peakHz:         String = "",
+        val peakDb:         String = "",
+        val bpm:            Float  = 0f,
+        val beatPulseMs:    Long   = 0L,
+        val waveformSamples: FloatArray = FloatArray(0)
     ) : ChromaSoundUiState
 }
 
@@ -118,6 +119,8 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
             putString("mirrorMode",     s.mirrorMode.name)
             putInt("trailLength",       s.trailLength)
             putFloat("beatSensitivity", s.beatSensitivity)
+            putFloat("colorAnimSpeed",  s.colorAnimSpeed)
+            putBoolean("showWaveform",  s.showWaveform)
             // Note: bandColors (Map<Int,Color>) are not persisted — they reset on restart.
             // Full persistence of custom band colours will be added in a future build.
             apply()
@@ -148,6 +151,8 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
                 } catch (_: Exception) { defaults.mirrorMode },
                 trailLength    = prefs.getInt("trailLength",       defaults.trailLength),
                 beatSensitivity = prefs.getFloat("beatSensitivity", defaults.beatSensitivity),
+                colorAnimSpeed  = prefs.getFloat("colorAnimSpeed",  defaults.colorAnimSpeed),
+                showWaveform    = prefs.getBoolean("showWaveform",  defaults.showWaveform),
                 bandColors     = emptyMap()   // reset on every launch
             )
         } catch (_: Exception) {
@@ -170,7 +175,8 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
             subBands       = new.subBands.coerceIn(Settings.MIN_SUB_BANDS, Settings.MAX_SUB_BANDS),
             noiseGateDb    = new.noiseGateDb.coerceIn(Settings.MIN_NOISE_GATE_DB, Settings.MAX_NOISE_GATE_DB),
             trailLength     = new.trailLength.coerceIn(Settings.MIN_TRAIL_LENGTH, Settings.MAX_TRAIL_LENGTH),
-            beatSensitivity = new.beatSensitivity.coerceIn(Settings.MIN_BEAT_SENSITIVITY, Settings.MAX_BEAT_SENSITIVITY)
+            beatSensitivity = new.beatSensitivity.coerceIn(Settings.MIN_BEAT_SENSITIVITY, Settings.MAX_BEAT_SENSITIVITY),
+            colorAnimSpeed  = new.colorAnimSpeed.coerceIn(Settings.MIN_COLOR_ANIM_SPEED, Settings.MAX_COLOR_ANIM_SPEED)
         ).let { it.copy(bandColors = new.bandColors) }
 
         _settings.value = s
@@ -277,9 +283,10 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
             bandCount   = bd.count,
             peakHz      = loudest?.let { formatHz(it.centreHz) } ?: "—",
             peakDb      = loudest?.let { "${"%.1f".format(it.decibelLevel)} dB" } ?: "—",
-            bpm         = frame.bpm,
-            beatPulseMs = if (frame.isBeat) System.currentTimeMillis() else
-                (_uiState.value as? ChromaSoundUiState.Running)?.beatPulseMs ?: 0L
+            bpm            = frame.bpm,
+            beatPulseMs    = if (frame.isBeat) System.currentTimeMillis() else
+                (_uiState.value as? ChromaSoundUiState.Running)?.beatPulseMs ?: 0L,
+            waveformSamples = frame.waveformSamples
         )
     }
 }

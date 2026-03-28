@@ -79,12 +79,14 @@ fun ChromaSoundScreen(
             when (uiState) {
                 is ChromaSoundUiState.Running ->
                     RunningScreen(
-                        state       = uiState,
-                        objectShape = settings.objectShape,
-                        mirrorMode  = settings.mirrorMode,
-                        trailLength = settings.trailLength,
-                        onStop      = onStopRequested,
-                        onSettings  = { showSettings = true }
+                        state           = uiState,
+                        objectShape     = settings.objectShape,
+                        mirrorMode      = settings.mirrorMode,
+                        trailLength     = settings.trailLength,
+                        colorAnimSpeed  = settings.colorAnimSpeed,
+                        showWaveform    = settings.showWaveform,
+                        onStop          = onStopRequested,
+                        onSettings      = { showSettings = true }
                     )
                 ChromaSoundUiState.PermissionDenied -> PermissionDeniedScreen()
                 else -> IdleScreen(onStartRequested)
@@ -137,22 +139,27 @@ private fun IdleScreen(onStart: () -> Unit) {
 // ── Running ───────────────────────────────────────────────────────────────────
 @Composable
 private fun RunningScreen(
-    state:       ChromaSoundUiState.Running,
-    objectShape: ObjectShape,
-    mirrorMode:  MirrorMode,
-    trailLength: Int,
-    onStop:      () -> Unit,
-    onSettings:  () -> Unit
+    state:          ChromaSoundUiState.Running,
+    objectShape:    ObjectShape,
+    mirrorMode:     MirrorMode,
+    trailLength:    Int,
+    colorAnimSpeed: Float,
+    showWaveform:   Boolean,
+    onStop:         () -> Unit,
+    onSettings:     () -> Unit
 ) {
     Box(Modifier.fillMaxSize()) {
         VisualizerCanvas(
-            circles     = state.circles,
-            bandCount   = state.bandCount,
-            shape       = objectShape,
-            mirrorMode  = mirrorMode,
-            trailLength = trailLength,
-            beatPulseMs = state.beatPulseMs,
-            modifier    = Modifier.fillMaxSize()
+            circles         = state.circles,
+            bandCount       = state.bandCount,
+            shape           = objectShape,
+            mirrorMode      = mirrorMode,
+            trailLength     = trailLength,
+            beatPulseMs     = state.beatPulseMs,
+            colorAnimSpeed  = colorAnimSpeed,
+            showWaveform    = showWaveform,
+            waveformSamples = state.waveformSamples,
+            modifier        = Modifier.fillMaxSize()
         )
         TopHud(
             rmsVolume   = state.rmsVolume,
@@ -181,16 +188,20 @@ private fun RunningScreen(
 // ── Unified visualiser canvas ─────────────────────────────────────────────────
 @Composable
 private fun VisualizerCanvas(
-    circles:     List<FrequencyCircle>,
-    bandCount:   Int,
-    shape:       ObjectShape,
-    mirrorMode:  MirrorMode,
-    trailLength: Int,
-    beatPulseMs: Long,
-    modifier:    Modifier = Modifier
+    circles:         List<FrequencyCircle>,
+    bandCount:       Int,
+    shape:           ObjectShape,
+    mirrorMode:      MirrorMode,
+    trailLength:     Int,
+    beatPulseMs:     Long,
+    colorAnimSpeed:  Float,
+    showWaveform:    Boolean,
+    waveformSamples: FloatArray,
+    modifier:        Modifier = Modifier
 ) {
-    var nowMs    by remember { mutableStateOf(System.currentTimeMillis()) }
-    var angleRad by remember { mutableStateOf(0f) }
+    var nowMs        by remember { mutableStateOf(System.currentTimeMillis()) }
+    var angleRad     by remember { mutableStateOf(0f) }
+    var hueOffsetDeg by remember { mutableStateOf(0f) }
 
     // Trail history: a ring buffer of recent circle snapshots.
     // Each entry is a full List<FrequencyCircle> captured at that frame.
@@ -223,7 +234,9 @@ private fun VisualizerCanvas(
         while (true) {
             withFrameMillis { frameMs ->
                 angleRad = (frameMs / 2000f * 2f * PI.toFloat()) % (2f * PI.toFloat())
-                nowMs    = frameMs
+                if (colorAnimSpeed > 0f)
+                    hueOffsetDeg = (hueOffsetDeg + colorAnimSpeed * 0.6f) % 360f
+                nowMs = frameMs
             }
         }
     }
@@ -254,23 +267,90 @@ private fun VisualizerCanvas(
             )
         }
 
-        // ── 3. Draw shapes with mirror mode ───────────────────────────────────
+        // ── 3. Waveform overlay ───────────────────────────────────────────────
+        if (showWaveform && waveformSamples.isNotEmpty()) {
+            val waveH    = h * 0.12f          // 12% of screen height
+            val waveTop  = h - waveH - h * 0.08f
+            val stepX    = w / (waveformSamples.size - 1).toFloat()
+            val waveColor = Color(0xFF7C6FFF).copy(alpha = 0.55f)
+            // Glow pass (wider, more transparent)
+            for (i in 0 until waveformSamples.size - 1) {
+                val x1 = i * stepX
+                val x2 = (i + 1) * stepX
+                val y1 = waveTop + waveH * 0.5f - waveformSamples[i] * waveH * 0.45f
+                val y2 = waveTop + waveH * 0.5f - waveformSamples[i + 1] * waveH * 0.45f
+                drawLine(
+                    color       = Color(0xFF7C6FFF).copy(alpha = 0.15f),
+                    start       = Offset(x1, y1),
+                    end         = Offset(x2, y2),
+                    strokeWidth = 6f,
+                    blendMode   = BlendMode.Screen
+                )
+            }
+            // Core line pass
+            for (i in 0 until waveformSamples.size - 1) {
+                val x1 = i * stepX
+                val x2 = (i + 1) * stepX
+                val y1 = waveTop + waveH * 0.5f - waveformSamples[i] * waveH * 0.45f
+                val y2 = waveTop + waveH * 0.5f - waveformSamples[i + 1] * waveH * 0.45f
+                drawLine(
+                    color       = waveColor,
+                    start       = Offset(x1, y1),
+                    end         = Offset(x2, y2),
+                    strokeWidth = 1.5f,
+                    blendMode   = BlendMode.Screen
+                )
+            }
+        }
+
+        // ── 4. Draw shapes with mirror mode ───────────────────────────────────
         // Mirror mode works by computing reflected coordinates directly.
-        // NO canvas transforms are used — they caused full-canvas bleed-over.
-        // Instead, each shape is drawn at its original position PLUS additional
-        // copies at reflected positions, all within the same canvas pass.
+        // NO canvas transforms are used.
+        // Hue drift: when colorAnimSpeed > 0, shift each circle's colour by hueOffsetDeg.
+
+        fun shiftedColor(c: FrequencyCircle): Color {
+            if (hueOffsetDeg == 0f) return c.color
+            // Convert RGB to HSV, add offset, convert back
+            val r = c.color.red; val g = c.color.green; val b = c.color.blue
+            val max = maxOf(r, g, b); val min = minOf(r, g, b); val delta = max - min
+            val h = when {
+                delta == 0f -> 0f
+                max == r    -> 60f * (((g - b) / delta) % 6f)
+                max == g    -> 60f * (((b - r) / delta) + 2f)
+                else        -> 60f * (((r - g) / delta) + 4f)
+            }.let { if (it < 0f) it + 360f else it }
+            val s = if (max == 0f) 0f else delta / max
+            val v = max
+            val newH = ((h + hueOffsetDeg) % 360f + 360f) % 360f
+            val hi = (newH / 60f).toInt() % 6
+            val f  = newH / 60f - hi
+            val p  = v * (1f - s); val q = v * (1f - f * s); val t = v * (1f - (1f - f) * s)
+            val (nr, ng, nb) = when (hi) {
+                0 -> Triple(v, t, p); 1 -> Triple(q, v, p); 2 -> Triple(p, v, t)
+                3 -> Triple(p, q, v); 4 -> Triple(t, p, v); else -> Triple(v, p, q)
+            }
+            return c.color.copy(red = nr, green = ng, blue = nb)
+        }
+
 
         fun drawCircleAtPos(circle: FrequencyCircle, life: Float, cx: Float, cy: Float) {
             val reflected = circle.copy(
                 x        = cx / w,
                 y        = cy / h,
-                radiusPx = circle.radiusPx * animatedPulse
+                radiusPx = circle.radiusPx * animatedPulse,
+                color    = shiftedColor(circle)
             )
             drawShape(reflected, life, shape, angleRad)
         }
 
         fun drawShapePulsed(circle: FrequencyCircle, life: Float) {
-            drawShape(circle.copy(radiusPx = circle.radiusPx * animatedPulse), life, shape, angleRad)
+            drawShape(
+                circle.copy(
+                    radiusPx = circle.radiusPx * animatedPulse,
+                    color    = shiftedColor(circle)
+                ),
+                life, shape, angleRad
+            )
         }
 
         circles.forEach { circle ->

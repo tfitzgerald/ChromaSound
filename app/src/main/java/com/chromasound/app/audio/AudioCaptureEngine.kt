@@ -188,8 +188,12 @@ class AudioCaptureEngine {
                     if (medianInterval > 0) (60_000f / medianInterval).coerceIn(40f, 240f) else 0f
                 } else 0f
 
+                // ── Waveform downsample ───────────────────────────────────────
+                // Reduce 4096 PCM samples to 256 for the overlay — take every 16th
+                val waveformSamples = FloatArray(256) { i -> pcm[i * 16] }
+
                 emit(AudioFrame(magnitudes, rms, dBLevels, bandPeakBins, bandSubEnergies,
-                    isBeat = isBeat, bpm = bpm))
+                    isBeat = isBeat, bpm = bpm, waveformSamples = waveformSamples))
             }
         } finally {
             recorder.stop()
