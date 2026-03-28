@@ -319,7 +319,7 @@ private fun SettingsHubScreen(
 
         // ── Version footer ────────────────────────────────────────────────────────
         item {
-            Text("ChromaSound  ·  Version 2.1.1",
+            Text("ChromaSound  ·  Version 2.1.2",
                 color = UiSubtle.copy(alpha = 0.6f), fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())

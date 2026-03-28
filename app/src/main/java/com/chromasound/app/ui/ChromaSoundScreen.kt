@@ -513,16 +513,6 @@ private fun VisualizerCanvas(
         }
 
 
-        fun drawCircleAtPos(circle: FrequencyCircle, life: Float, cx: Float, cy: Float) {
-            val reflected = circle.copy(
-                x        = cx / w,
-                y        = cy / h,
-                radiusPx = circle.radiusPx * animatedPulse,
-                color    = shiftedColor(circle)
-            )
-            drawShapePulsed(reflected, life)
-        }
-
         fun drawShapePulsed(circle: FrequencyCircle, life: Float) {
             val shifted = circle.copy(
                 radiusPx = circle.radiusPx * animatedPulse,
@@ -555,6 +545,16 @@ private fun VisualizerCanvas(
             } else {
                 drawShape(shifted, life, shape, angleRad)
             }
+        }
+
+        fun drawCircleAtPos(circle: FrequencyCircle, life: Float, cx: Float, cy: Float) {
+            val reflected = circle.copy(
+                x        = cx / w,
+                y        = cy / h,
+                radiusPx = circle.radiusPx * animatedPulse,
+                color    = shiftedColor(circle)
+            )
+            drawShapePulsed(reflected, life)
         }
 
         circles.forEach { circle ->
