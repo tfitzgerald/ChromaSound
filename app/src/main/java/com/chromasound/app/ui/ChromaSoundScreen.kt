@@ -456,6 +456,12 @@ private fun VisualizerCanvas(
         val h = size.height
 
         // ── 0. Background ─────────────────────────────────────────────────
+        // IMPORTANT: Read rmsVolume and nowMs unconditionally here so Compose
+        // tracks them as state dependencies regardless of which branch executes.
+        // If they are only read inside a branch, Compose stops invalidating the
+        // canvas when they change (snapshot tracking only covers executed reads).
+        val bgRms   = rmsVolume
+        val bgNowMs = nowMs
         when (backgroundEffect) {
             // Canvas background is ALWAYS near-black regardless of theme.
             // Light theme applies to UI chrome (settings, HUD cards) but the
@@ -465,7 +471,7 @@ private fun VisualizerCanvas(
                 drawRect(color = Color(0xFF050508))
                 // Boost RMS heavily — raw values 0.002–0.05 need strong amplification
                 // Use a power curve so quiet sounds still show some bloom
-                val rmsAmp = (rmsVolume * 30f).coerceIn(0f, 1f)
+                val rmsAmp = (bgRms * 30f).coerceIn(0f, 1f)
                 val bloom  = rmsAmp.let { it * it }.coerceIn(0f, 1f)  // power curve
 
                 // Layer 1: wide soft glow covering the whole screen
@@ -490,7 +496,7 @@ private fun VisualizerCanvas(
             }
             BackgroundEffect.NOISE -> {
                 drawRect(color = Color(0xFF050508))
-                val rng = kotlin.random.Random(nowMs / 33L)
+                val rng = kotlin.random.Random(bgNowMs / 33L)
                 repeat(400) {
                     val nx = rng.nextFloat() * w
                     val ny = rng.nextFloat() * h
