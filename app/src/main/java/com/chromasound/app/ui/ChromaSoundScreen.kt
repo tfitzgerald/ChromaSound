@@ -144,13 +144,13 @@ private fun RunningScreen(
     onSettings:  () -> Unit
 ) {
     Box(Modifier.fillMaxSize()) {
-        // Single canvas for both lane grid and shapes — one clear covers both layers
         VisualizerCanvas(
             circles     = state.circles,
             bandCount   = state.bandCount,
             shape       = objectShape,
             mirrorMode  = mirrorMode,
             trailLength = trailLength,
+            beatPulseMs = state.beatPulseMs,
             modifier    = Modifier.fillMaxSize()
         )
         TopHud(
@@ -159,6 +159,7 @@ private fun RunningScreen(
             bandCount   = state.bandCount,
             peakHz      = state.peakHz,
             peakDb      = state.peakDb,
+            bpm         = state.bpm,
             onSettings  = onSettings,
             modifier    = Modifier.fillMaxWidth().align(Alignment.TopCenter)
                 .padding(top = 52.dp, start = 20.dp, end = 20.dp)
@@ -177,10 +178,6 @@ private fun RunningScreen(
 }
 
 // ── Unified visualiser canvas ─────────────────────────────────────────────────
-// A single Canvas composable draws everything — background clear, band lane
-// grid lines, trail ghosts, and live shapes — in the correct order.
-// Using one Canvas means one drawRect() clears everything atomically each frame,
-// preventing any layer from accumulating across recompositions.
 @Composable
 private fun VisualizerCanvas(
     circles:     List<FrequencyCircle>,
@@ -188,6 +185,7 @@ private fun VisualizerCanvas(
     shape:       ObjectShape,
     mirrorMode:  MirrorMode,
     trailLength: Int,
+    beatPulseMs: Long,
     modifier:    Modifier = Modifier
 ) {
     var nowMs    by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -199,8 +197,25 @@ private fun VisualizerCanvas(
     val trailHistory = remember {
         ArrayDeque<List<FrequencyCircle>>(Settings.MAX_TRAIL_LENGTH)
     }
-    // Track the previous circles list so we only push when it changes
     var prevCircles by remember { mutableStateOf<List<FrequencyCircle>>(emptyList()) }
+
+    // Beat pulse animation — animates from 1.4 back to 1.0 over 250ms on each beat
+    var pulseScale by remember { mutableStateOf(1f) }
+    val animatedPulse by animateFloatAsState(
+        targetValue    = pulseScale,
+        animationSpec  = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness    = Spring.StiffnessHigh
+        ),
+        label = "beatPulse"
+    )
+    // Trigger pulse whenever beatPulseMs changes
+    LaunchedEffect(beatPulseMs) {
+        if (beatPulseMs > 0L) {
+            pulseScale = 1.4f
+            pulseScale = 1f
+        }
+    }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -211,7 +226,6 @@ private fun VisualizerCanvas(
         }
     }
 
-    // Update trail history whenever circles list changes
     if (circles !== prevCircles) {
         if (trailLength > 0 && prevCircles.isNotEmpty()) {
             trailHistory.addFirst(prevCircles)
@@ -226,11 +240,8 @@ private fun VisualizerCanvas(
         val w = size.width
         val h = size.height
 
-        // ── 1. Clear entire canvas every frame ────────────────────────────────
-        // Single drawRect covers all layers — no previous frame content survives.
         drawRect(color = Color(0xFF050508))
 
-        // ── 2. Band lane grid lines ───────────────────────────────────────────
         val laneW = w / bandCount
         for (i in 1 until bandCount) {
             drawLine(
@@ -249,29 +260,15 @@ private fun VisualizerCanvas(
 
         fun drawCircleAtPos(circle: FrequencyCircle, life: Float, cx: Float, cy: Float) {
             val reflected = circle.copy(
-                x = cx / w,
-                y = cy / h
+                x        = cx / w,
+                y        = cy / h,
+                radiusPx = circle.radiusPx * animatedPulse
             )
             drawShape(reflected, life, shape, angleRad)
         }
 
-        fun drawWithTrailAt(circle: FrequencyCircle, cx: Float, cy: Float) {
-            val life = circle.lifeFraction(nowMs)
-            if (life <= 0f) return
-            // Trail ghosts
-            if (trailLength > 0) {
-                val visibleTrail = trailHistory.take(trailLength)
-                visibleTrail.forEachIndexed { ghostIndex, ghostCircles ->
-                    val trailAlpha = (1f - (ghostIndex + 1f) / (trailLength + 1f)) * 0.55f
-                    ghostCircles.forEach { ghost ->
-                        val gLife = ghost.lifeFraction(nowMs)
-                        if (gLife > 0f && ghost.bandIndex == circle.bandIndex && ghost.slotIndex == circle.slotIndex) {
-                            drawCircleAtPos(ghost, gLife * trailAlpha, cx, cy)
-                        }
-                    }
-                }
-            }
-            drawCircleAtPos(circle, life, cx, cy)
+        fun drawShapePulsed(circle: FrequencyCircle, life: Float) {
+            drawShape(circle.copy(radiusPx = circle.radiusPx * animatedPulse), life, shape, angleRad)
         }
 
         circles.forEach { circle ->
@@ -288,22 +285,20 @@ private fun VisualizerCanvas(
 
             when (mirrorMode) {
                 MirrorMode.OFF -> {
-                    // Trails
                     if (trailLength > 0) {
                         trailHistory.take(trailLength).forEachIndexed { gi, ghosts ->
                             val ta = (1f - (gi + 1f) / (trailLength + 1f)) * 0.55f
                             ghosts.filter { it.bandIndex == circle.bandIndex && it.slotIndex == circle.slotIndex }
                                 .forEach { g ->
                                     val gl = g.lifeFraction(nowMs)
-                                    if (gl > 0f) drawShape(g, gl * ta, shape, angleRad)
+                                    if (gl > 0f) drawShapePulsed(g, gl * ta)
                                 }
                         }
                     }
-                    drawShape(circle, life, shape, angleRad)
+                    drawShapePulsed(circle, life)
                 }
                 MirrorMode.HORIZONTAL -> {
-                    // Original + horizontally mirrored copy
-                    drawShape(circle, life, shape, angleRad)
+                    drawShapePulsed(circle, life)
                     drawCircleAtPos(circle, life, mx, oy)
                     if (trailLength > 0) {
                         trailHistory.take(trailLength).forEachIndexed { gi, ghosts ->
@@ -312,7 +307,7 @@ private fun VisualizerCanvas(
                                 .forEach { g ->
                                     val gl = g.lifeFraction(nowMs)
                                     if (gl > 0f) {
-                                        drawShape(g, gl * ta, shape, angleRad)
+                                        drawShapePulsed(g, gl * ta)
                                         drawCircleAtPos(g, gl * ta, w - g.x * w, g.y * h)
                                     }
                                 }
@@ -320,8 +315,7 @@ private fun VisualizerCanvas(
                     }
                 }
                 MirrorMode.VERTICAL -> {
-                    // Original + vertically mirrored copy
-                    drawShape(circle, life, shape, angleRad)
+                    drawShapePulsed(circle, life)
                     drawCircleAtPos(circle, life, ox, my)
                     if (trailLength > 0) {
                         trailHistory.take(trailLength).forEachIndexed { gi, ghosts ->
@@ -330,7 +324,7 @@ private fun VisualizerCanvas(
                                 .forEach { g ->
                                     val gl = g.lifeFraction(nowMs)
                                     if (gl > 0f) {
-                                        drawShape(g, gl * ta, shape, angleRad)
+                                        drawShapePulsed(g, gl * ta)
                                         drawCircleAtPos(g, gl * ta, g.x * w, h - g.y * h)
                                     }
                                 }
@@ -338,11 +332,10 @@ private fun VisualizerCanvas(
                     }
                 }
                 MirrorMode.QUAD -> {
-                    // All four quadrant copies
-                    drawShape(circle, life, shape, angleRad)        // top-left
-                    drawCircleAtPos(circle, life, mx, oy)           // top-right
-                    drawCircleAtPos(circle, life, ox, my)           // bottom-left
-                    drawCircleAtPos(circle, life, mx, my)           // bottom-right
+                    drawShapePulsed(circle, life)
+                    drawCircleAtPos(circle, life, mx, oy)
+                    drawCircleAtPos(circle, life, ox, my)
+                    drawCircleAtPos(circle, life, mx, my)
                     if (trailLength > 0) {
                         trailHistory.take(trailLength).forEachIndexed { gi, ghosts ->
                             val ta = (1f - (gi + 1f) / (trailLength + 1f)) * 0.55f
@@ -352,7 +345,7 @@ private fun VisualizerCanvas(
                                     if (gl > 0f) {
                                         val gox = g.x * w;  val goy = g.y * h
                                         val gmx = w - gox;  val gmy = h - goy
-                                        drawShape(g, gl * ta, shape, angleRad)
+                                        drawShapePulsed(g, gl * ta)
                                         drawCircleAtPos(g, gl * ta, gmx, goy)
                                         drawCircleAtPos(g, gl * ta, gox, gmy)
                                         drawCircleAtPos(g, gl * ta, gmx, gmy)
@@ -655,7 +648,8 @@ private fun Float.pow(n: Int): Float = Math.pow(this.toDouble(), n.toDouble()).t
 @Composable
 private fun TopHud(
     rmsVolume: Float, activeCount: Int, bandCount: Int,
-    peakHz: String, peakDb: String, onSettings: () -> Unit, modifier: Modifier = Modifier
+    peakHz: String, peakDb: String, bpm: Float,
+    onSettings: () -> Unit, modifier: Modifier = Modifier
 ) {
     Row(modifier, Arrangement.SpaceBetween, Alignment.CenterVertically) {
         val blink = rememberInfiniteTransition(label = "blink")
@@ -674,6 +668,12 @@ private fun TopHud(
             Spacer(Modifier.height(2.dp))
             Text("$activeCount / $bandCount bands", color = UiText,
                 fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+            if (bpm > 0f) {
+                Spacer(Modifier.height(2.dp))
+                Text("${bpm.toInt()} BPM", color = UiAccent,
+                    fontSize = 11.sp, fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold)
+            }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("VOL", color = UiSubtle, fontSize = 9.sp,

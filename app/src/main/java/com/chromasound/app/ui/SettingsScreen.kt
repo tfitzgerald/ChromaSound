@@ -54,8 +54,9 @@ fun SettingsScreen(
     var objectShape    by remember { mutableStateOf(currentSettings.objectShape) }
     var subBands       by remember { mutableStateOf(currentSettings.subBands.toFloat()) }
     var noiseGateDb    by remember { mutableStateOf(currentSettings.noiseGateDb) }
-    var mirrorMode     by remember { mutableStateOf(currentSettings.mirrorMode) }
-    var trailLength    by remember { mutableStateOf(currentSettings.trailLength.toFloat()) }
+    var mirrorMode      by remember { mutableStateOf(currentSettings.mirrorMode) }
+    var trailLength     by remember { mutableStateOf(currentSettings.trailLength.toFloat()) }
+    var beatSensitivity by remember { mutableStateOf(currentSettings.beatSensitivity) }
 
     fun emit() = onSettingsChange(Settings(
         bandCount      = bandCount.roundToInt(),
@@ -69,8 +70,9 @@ fun SettingsScreen(
         objectShape    = objectShape,
         subBands       = subBands.roundToInt(),
         noiseGateDb    = noiseGateDb,
-        mirrorMode     = mirrorMode,
-        trailLength    = trailLength.roundToInt()
+        mirrorMode      = mirrorMode,
+        trailLength     = trailLength.roundToInt(),
+        beatSensitivity = beatSensitivity
     ))
 
     val bands     = remember(bandCount.roundToInt()) { BandDefinition.build(bandCount.roundToInt()) }
@@ -404,6 +406,26 @@ fun SettingsScreen(
                     modifier    = Modifier.fillMaxWidth()
                 )
                 SliderLabels("Off", "${Settings.MAX_TRAIL_LENGTH} frames")
+            }
+            Spacer(Modifier.height(14.dp))
+        }
+
+        // ── Beat sensitivity ──────────────────────────────────────────────────
+        item {
+            SettingCard(
+                "BEAT SENSITIVITY",
+                "How loud above average to count as a beat",
+                value  = "×${"%.1f".format(beatSensitivity)}",
+                unit   = "threshold"
+            ) {
+                Slider(
+                    value         = beatSensitivity,
+                    onValueChange = { beatSensitivity = it; emit() },
+                    valueRange    = Settings.MIN_BEAT_SENSITIVITY..Settings.MAX_BEAT_SENSITIVITY,
+                    colors        = sliderColors,
+                    modifier      = Modifier.fillMaxWidth()
+                )
+                SliderLabels("×1.1  very sensitive", "×2.5  hard hits only")
             }
             Spacer(Modifier.height(14.dp))
         }

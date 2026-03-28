@@ -36,7 +36,9 @@ sealed interface ChromaSoundUiState {
         val activeCount: Int   = 0,
         val bandCount:   Int   = BandDefinition.DEFAULT_BANDS,
         val peakHz:      String = "",
-        val peakDb:      String = ""
+        val peakDb:      String = "",
+        val bpm:         Float  = 0f,
+        val beatPulseMs: Long   = 0L   // timestamp of last beat — used to drive pulse animation
     ) : ChromaSoundUiState
 }
 
@@ -113,8 +115,9 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
             putString("objectShape",  s.objectShape.name)
             putInt("subBands",        s.subBands)
             putFloat("noiseGateDb",   s.noiseGateDb)
-            putString("mirrorMode",   s.mirrorMode.name)
-            putInt("trailLength",     s.trailLength)
+            putString("mirrorMode",     s.mirrorMode.name)
+            putInt("trailLength",       s.trailLength)
+            putFloat("beatSensitivity", s.beatSensitivity)
             // Note: bandColors (Map<Int,Color>) are not persisted — they reset on restart.
             // Full persistence of custom band colours will be added in a future build.
             apply()
@@ -143,7 +146,8 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
                 mirrorMode     = try {
                     MirrorMode.valueOf(prefs.getString("mirrorMode", defaults.mirrorMode.name) ?: defaults.mirrorMode.name)
                 } catch (_: Exception) { defaults.mirrorMode },
-                trailLength    = prefs.getInt("trailLength",    defaults.trailLength),
+                trailLength    = prefs.getInt("trailLength",       defaults.trailLength),
+                beatSensitivity = prefs.getFloat("beatSensitivity", defaults.beatSensitivity),
                 bandColors     = emptyMap()   // reset on every launch
             )
         } catch (_: Exception) {
@@ -165,7 +169,8 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
             sensitivity    = new.sensitivity.coerceIn(Settings.MIN_SENSITIVITY, Settings.MAX_SENSITIVITY),
             subBands       = new.subBands.coerceIn(Settings.MIN_SUB_BANDS, Settings.MAX_SUB_BANDS),
             noiseGateDb    = new.noiseGateDb.coerceIn(Settings.MIN_NOISE_GATE_DB, Settings.MAX_NOISE_GATE_DB),
-            trailLength    = new.trailLength.coerceIn(Settings.MIN_TRAIL_LENGTH, Settings.MAX_TRAIL_LENGTH)
+            trailLength     = new.trailLength.coerceIn(Settings.MIN_TRAIL_LENGTH, Settings.MAX_TRAIL_LENGTH),
+            beatSensitivity = new.beatSensitivity.coerceIn(Settings.MIN_BEAT_SENSITIVITY, Settings.MAX_BEAT_SENSITIVITY)
         ).let { it.copy(bandColors = new.bandColors) }
 
         _settings.value = s
@@ -186,10 +191,11 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
         _uiState.value = ChromaSoundUiState.Running(bandCount = _settings.value.bandCount)
         captureJob = viewModelScope.launch {
             engine.audioFrameFlow(
-                bands       = { currentBands },
-                sensitivity = { _settings.value.sensitivity },
-                subBands    = { _settings.value.subBands },
-                noiseGate   = { _settings.value.noiseGateDb }
+                bands            = { currentBands },
+                sensitivity      = { _settings.value.sensitivity },
+                subBands         = { _settings.value.subBands },
+                noiseGate        = { _settings.value.noiseGateDb },
+                beatSensitivity  = { _settings.value.beatSensitivity }
             )
                 .catch { _uiState.value = ChromaSoundUiState.Idle }
                 .collect { frame -> processFrame(frame) }
@@ -270,7 +276,10 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
             activeCount = alive.size,
             bandCount   = bd.count,
             peakHz      = loudest?.let { formatHz(it.centreHz) } ?: "—",
-            peakDb      = loudest?.let { "${"%.1f".format(it.decibelLevel)} dB" } ?: "—"
+            peakDb      = loudest?.let { "${"%.1f".format(it.decibelLevel)} dB" } ?: "—",
+            bpm         = frame.bpm,
+            beatPulseMs = if (frame.isBeat) System.currentTimeMillis() else
+                (_uiState.value as? ChromaSoundUiState.Running)?.beatPulseMs ?: 0L
         )
     }
 }

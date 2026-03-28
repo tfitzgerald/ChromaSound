@@ -43,31 +43,35 @@ data class Settings(
     val subBands:       Int              = 4,
     val bandColors:     Map<Int, Color>  = emptyMap(),
     val noiseGateDb:    Float            = -50f,
-    // Mirror mode — reflects shapes across one or both axes
     val mirrorMode:     MirrorMode       = MirrorMode.OFF,
-    // Trail length — number of ghost frames behind each shape (0 = off)
-    val trailLength:    Int              = 0
+    val trailLength:    Int              = 0,
+    // Beat sensitivity — how much louder than recent average counts as a beat.
+    // 1.1 = very sensitive, 2.0 = only hard transients
+    val beatSensitivity: Float           = 1.3f
 ) {
     companion object {
-        const val MIN_LIFETIME_MS       = 100L
-        const val MAX_LIFETIME_MS       = 2000L
-        const val MIN_CIRCLES_PER_BAND  = 1
-        const val MAX_CIRCLES_PER_BAND  = 5
-        const val MIN_RADIUS_FLOOR      = 5f
-        const val MAX_RADIUS_FLOOR      = 120f
-        const val MIN_RADIUS_CEILING    = 20f
-        const val MAX_RADIUS_CEILING    = 250f
-        const val MIN_PLACEMENT         = 0f
-        const val MAX_PLACEMENT         = 1f
-        const val MIN_SENSITIVITY       = 0.1f
-        const val MAX_SENSITIVITY       = 3.0f
-        const val MIN_SUB_BANDS         = 1
-        const val MAX_SUB_BANDS         = 12
-        const val MIN_NOISE_GATE_DB     = -70f
-        const val MAX_NOISE_GATE_DB     = -20f
-        const val DEFAULT_NOISE_GATE_DB = -50f
-        const val MIN_TRAIL_LENGTH      = 0
-        const val MAX_TRAIL_LENGTH      = 8
+        const val MIN_LIFETIME_MS        = 100L
+        const val MAX_LIFETIME_MS        = 2000L
+        const val MIN_CIRCLES_PER_BAND   = 1
+        const val MAX_CIRCLES_PER_BAND   = 5
+        const val MIN_RADIUS_FLOOR       = 5f
+        const val MAX_RADIUS_FLOOR       = 120f
+        const val MIN_RADIUS_CEILING     = 20f
+        const val MAX_RADIUS_CEILING     = 250f
+        const val MIN_PLACEMENT          = 0f
+        const val MAX_PLACEMENT          = 1f
+        const val MIN_SENSITIVITY        = 0.1f
+        const val MAX_SENSITIVITY        = 3.0f
+        const val MIN_SUB_BANDS          = 1
+        const val MAX_SUB_BANDS          = 12
+        const val MIN_NOISE_GATE_DB      = -70f
+        const val MAX_NOISE_GATE_DB      = -20f
+        const val DEFAULT_NOISE_GATE_DB  = -50f
+        const val MIN_TRAIL_LENGTH       = 0
+        const val MAX_TRAIL_LENGTH       = 8
+        const val MIN_BEAT_SENSITIVITY   = 1.1f
+        const val MAX_BEAT_SENSITIVITY   = 2.5f
+        const val DEFAULT_BEAT_SENSITIVITY = 1.3f
     }
 }
 
@@ -118,7 +122,9 @@ data class AudioFrame(
     val rmsVolume:       Float            = 0f,
     val decibelLevels:   FloatArray       = FloatArray(0),
     val bandPeakBins:    IntArray         = IntArray(0),
-    val bandSubEnergies: Array<FloatArray> = emptyArray()
+    val bandSubEnergies: Array<FloatArray> = emptyArray(),
+    val isBeat:          Boolean          = false,   // true when a beat was detected this frame
+    val bpm:             Float            = 0f       // estimated BPM from recent beat intervals
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

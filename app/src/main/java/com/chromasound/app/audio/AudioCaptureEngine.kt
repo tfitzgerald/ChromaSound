@@ -29,16 +29,18 @@ class AudioCaptureEngine {
     private val hannWindow = FFTEngine.hannWindow(FFT_SIZE)
 
     /**
-     * @param bands       Current [BandDefinition] — read each frame.
-     * @param sensitivity dB gain multiplier — read each frame.
-     * @param subBands    Number of sub-bands per band for shading — read each frame.
-     * @param noiseGate   Minimum dBFS threshold for spawning a shape — read each frame.
+     * @param bands           Current [BandDefinition] — read each frame.
+     * @param sensitivity     dB gain multiplier — read each frame.
+     * @param subBands        Number of sub-bands per band for shading — read each frame.
+     * @param noiseGate       Minimum dBFS threshold for spawning a shape — read each frame.
+     * @param beatSensitivity How much louder than recent average RMS counts as a beat — read each frame.
      */
     fun audioFrameFlow(
-        bands:       () -> BandDefinition,
-        sensitivity: () -> Float,
-        subBands:    () -> Int,
-        noiseGate:   () -> Float
+        bands:            () -> BandDefinition,
+        sensitivity:      () -> Float,
+        subBands:         () -> Int,
+        noiseGate:        () -> Float,
+        beatSensitivity:  () -> Float
     ): Flow<AudioFrame> = flow {
 
         val minBuf     = AudioRecord.getMinBufferSize(
@@ -57,6 +59,13 @@ class AudioCaptureEngine {
 
         val pcm      = FloatArray(FFT_SIZE)
         val windowed = FloatArray(FFT_SIZE)
+
+        // ── Beat detection state ──────────────────────────────────────────────
+        // Rolling window of recent RMS values — 43 frames ≈ 4 seconds at 93ms/frame
+        val rmsHistory   = ArrayDeque<Float>(43)
+        val beatTimesMs  = ArrayDeque<Long>(8)   // timestamps of last 8 beats for BPM
+        var lastBeatMs   = 0L
+        val minBeatGapMs = 250L                  // max ~240 BPM — ignore faster
 
         try {
             recorder.startRecording()
@@ -152,7 +161,35 @@ class AudioCaptureEngine {
                     }
                 }
 
-                emit(AudioFrame(magnitudes, rms, dBLevels, bandPeakBins, bandSubEnergies))
+                // ── Beat detection ────────────────────────────────────────────
+                // Maintain rolling RMS history
+                rmsHistory.addLast(rms)
+                if (rmsHistory.size > 43) rmsHistory.removeFirst()
+
+                val avgRms   = if (rmsHistory.size > 1) rmsHistory.average().toFloat() else rms
+                val nowMs    = System.currentTimeMillis()
+                val thresh   = beatSensitivity().coerceIn(1.1f, 2.5f)
+                val isBeat   = rms > avgRms * thresh
+                              && rms > SILENCE_THRESHOLD * 3f
+                              && (nowMs - lastBeatMs) > minBeatGapMs
+
+                if (isBeat) {
+                    lastBeatMs = nowMs
+                    beatTimesMs.addLast(nowMs)
+                    if (beatTimesMs.size > 8) beatTimesMs.removeFirst()
+                }
+
+                // BPM from median interval of recent beats
+                val bpm = if (beatTimesMs.size >= 2) {
+                    val intervals = (1 until beatTimesMs.size).map {
+                        (beatTimesMs[it] - beatTimesMs[it - 1]).toFloat()
+                    }
+                    val medianInterval = intervals.sorted()[intervals.size / 2]
+                    if (medianInterval > 0) (60_000f / medianInterval).coerceIn(40f, 240f) else 0f
+                } else 0f
+
+                emit(AudioFrame(magnitudes, rms, dBLevels, bandPeakBins, bandSubEnergies,
+                    isBeat = isBeat, bpm = bpm))
             }
         } finally {
             recorder.stop()
