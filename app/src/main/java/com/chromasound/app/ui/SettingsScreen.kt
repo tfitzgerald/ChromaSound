@@ -562,7 +562,7 @@ fun SettingsScreen(
             }
             Spacer(Modifier.height(20.dp))
             Text(
-                "ChromaSound  ·  Version 1.3.0",
+                "ChromaSound  ·  Version 1.4.0",
                 color = UiSubtle.copy(alpha = 0.6f),
                 fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace,

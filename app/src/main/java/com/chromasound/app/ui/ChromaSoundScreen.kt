@@ -1,6 +1,7 @@
 package com.chromasound.app.ui
 
 import androidx.compose.animation.core.*
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -213,6 +214,7 @@ private fun VisualizerCanvas(
     LaunchedEffect(beatPulseMs) {
         if (beatPulseMs > 0L) {
             pulseScale = 1.4f
+            delay(16L)      // let one frame render at 1.4x before springing back
             pulseScale = 1f
         }
     }
