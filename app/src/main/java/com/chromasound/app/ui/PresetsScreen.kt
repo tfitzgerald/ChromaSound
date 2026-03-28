@@ -222,28 +222,33 @@ fun PresetsScreen(
     onClose:          () -> Unit
 ) {
     val context  = LocalContext.current
-    var presets  by remember { mutableStateOf(loadPresets(context)) }
+    // Use mutableStateListOf so mutations trigger recomposition reliably
+    val presets  = remember { mutableStateListOf<NamedPreset>().also {
+        it.addAll(loadPresets(context))
+    }}
     var showSaveDialog    by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf<Int?>(null) }
 
     fun deletePreset(index: Int) {
-        presets = presets.toMutableList().also { it.removeAt(index) }
-        savePresets(context, presets)
+        if (index in presets.indices) {
+            presets.removeAt(index)
+            savePresets(context, presets.toList())
+        }
     }
 
     fun savePreset(name: String) {
         if (name.isBlank()) return
         val trimmed = name.trim().take(24)
-        val updated = presets.toMutableList()
-        val existing = updated.indexOfFirst { it.name.equals(trimmed, ignoreCase = true) }
+        // Capture currentSettings snapshot NOW — this runs at call time, not composition time
+        val newPreset = currentSettings.toPreset(trimmed)
+        val existing = presets.indexOfFirst { it.name.equals(trimmed, ignoreCase = true) }
         if (existing >= 0) {
-            updated[existing] = currentSettings.toPreset(trimmed)
+            presets[existing] = newPreset
         } else {
-            if (updated.size >= MAX_PRESETS) updated.removeAt(updated.size - 1)
-            updated.add(0, currentSettings.toPreset(trimmed))
+            if (presets.size >= MAX_PRESETS) presets.removeAt(presets.size - 1)
+            presets.add(0, newPreset)
         }
-        presets = updated
-        savePresets(context, presets)
+        savePresets(context, presets.toList())
     }
 
     LazyColumn(
@@ -366,6 +371,7 @@ fun PresetsScreen(
 
     // ── Delete confirmation ───────────────────────────────────────────────────
     showDeleteConfirm?.let { index ->
+        val presetName = if (index in presets.indices) presets[index].name else "?"
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = null },
             containerColor   = BgCard,
@@ -374,7 +380,7 @@ fun PresetsScreen(
                     fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
             },
             text = {
-                Text("\"${presets.getOrNull(index)?.name}\" will be permanently removed.",
+                Text("\"$presetName\" will be permanently removed.",
                     color = UiSubtle, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
             },
             confirmButton = {
