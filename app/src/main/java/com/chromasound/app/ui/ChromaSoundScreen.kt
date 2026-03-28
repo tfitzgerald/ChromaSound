@@ -234,6 +234,10 @@ private fun ShapeCanvas(
         val w = size.width
         val h = size.height
 
+        // Clear the canvas every frame — without this, previous frames accumulate
+        // because Compose Canvas does not auto-clear between recompositions.
+        drawRect(color = Color(0xFF050508))
+
         // Helper: draw all circles once, applying the given X/Y axis flips
         fun drawAll(flipX: Boolean, flipY: Boolean) {
             // Draw trail ghosts first (behind live shapes)
