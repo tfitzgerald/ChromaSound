@@ -164,20 +164,23 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
 
     fun updateSettings(new: Settings) {
         val s = new.copy(
-            bandCount      = new.bandCount.coerceIn(BandDefinition.MIN_BANDS, BandDefinition.MAX_BANDS),
-            lifetimeMs     = new.lifetimeMs.coerceIn(Settings.MIN_LIFETIME_MS, Settings.MAX_LIFETIME_MS),
-            circlesPerBand = new.circlesPerBand.coerceIn(Settings.MIN_CIRCLES_PER_BAND, Settings.MAX_CIRCLES_PER_BAND),
-            minRadiusPx    = new.minRadiusPx.coerceIn(Settings.MIN_RADIUS_FLOOR, Settings.MAX_RADIUS_FLOOR),
-            maxRadiusPx    = new.maxRadiusPx.coerceIn(Settings.MIN_RADIUS_CEILING, Settings.MAX_RADIUS_CEILING)
+            bandCount       = new.bandCount.coerceIn(BandDefinition.MIN_BANDS, BandDefinition.MAX_BANDS),
+            lifetimeMs      = new.lifetimeMs.coerceIn(Settings.MIN_LIFETIME_MS, Settings.MAX_LIFETIME_MS),
+            circlesPerBand  = new.circlesPerBand.coerceIn(Settings.MIN_CIRCLES_PER_BAND, Settings.MAX_CIRCLES_PER_BAND),
+            minRadiusPx     = new.minRadiusPx.coerceIn(Settings.MIN_RADIUS_FLOOR, Settings.MAX_RADIUS_FLOOR),
+            maxRadiusPx     = new.maxRadiusPx.coerceIn(Settings.MIN_RADIUS_CEILING, Settings.MAX_RADIUS_CEILING)
                 .coerceAtLeast(new.minRadiusPx + 10f),
-            placement      = new.placement.coerceIn(Settings.MIN_PLACEMENT, Settings.MAX_PLACEMENT),
-            sensitivity    = new.sensitivity.coerceIn(Settings.MIN_SENSITIVITY, Settings.MAX_SENSITIVITY),
-            subBands       = new.subBands.coerceIn(Settings.MIN_SUB_BANDS, Settings.MAX_SUB_BANDS),
-            noiseGateDb    = new.noiseGateDb.coerceIn(Settings.MIN_NOISE_GATE_DB, Settings.MAX_NOISE_GATE_DB),
+            placement       = new.placement.coerceIn(Settings.MIN_PLACEMENT, Settings.MAX_PLACEMENT),
+            sensitivity     = new.sensitivity.coerceIn(Settings.MIN_SENSITIVITY, Settings.MAX_SENSITIVITY),
+            subBands        = new.subBands.coerceIn(Settings.MIN_SUB_BANDS, Settings.MAX_SUB_BANDS),
+            noiseGateDb     = new.noiseGateDb.coerceIn(Settings.MIN_NOISE_GATE_DB, Settings.MAX_NOISE_GATE_DB),
+            mirrorMode      = new.mirrorMode,
             trailLength     = new.trailLength.coerceIn(Settings.MIN_TRAIL_LENGTH, Settings.MAX_TRAIL_LENGTH),
             beatSensitivity = new.beatSensitivity.coerceIn(Settings.MIN_BEAT_SENSITIVITY, Settings.MAX_BEAT_SENSITIVITY),
-            colorAnimSpeed  = new.colorAnimSpeed.coerceIn(Settings.MIN_COLOR_ANIM_SPEED, Settings.MAX_COLOR_ANIM_SPEED)
-        ).let { it.copy(bandColors = new.bandColors) }
+            colorAnimSpeed  = new.colorAnimSpeed.coerceIn(Settings.MIN_COLOR_ANIM_SPEED, Settings.MAX_COLOR_ANIM_SPEED),
+            showWaveform    = new.showWaveform,
+            bandColors      = new.bandColors
+        )
 
         _settings.value = s
         saveSettings(s)   // persist to disk immediately

@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.chromasound.app.model.ColorScheme
+import com.chromasound.app.model.MirrorMode
 import com.chromasound.app.model.ObjectShape
 import com.chromasound.app.model.Settings
 
@@ -38,56 +39,70 @@ private val DangerC  = Color(0xFFFF4444)
 
 // ── Preset data model ─────────────────────────────────────────────────────────
 
-/** A named snapshot of all Settings (except bandColors). */
 data class NamedPreset(
-    val name:          String,
-    val bandCount:     Int,
-    val lifetimeMs:    Long,
-    val circlesPerBand:Int,
-    val minRadiusPx:   Float,
-    val maxRadiusPx:   Float,
-    val placement:     Float,
-    val sensitivity:   Float,
-    val colorScheme:   ColorScheme,
-    val objectShape:   ObjectShape,
-    val subBands:      Int,
-    val noiseGateDb:   Float
+    val name:           String,
+    val bandCount:      Int,
+    val lifetimeMs:     Long,
+    val circlesPerBand: Int,
+    val minRadiusPx:    Float,
+    val maxRadiusPx:    Float,
+    val placement:      Float,
+    val sensitivity:    Float,
+    val colorScheme:    ColorScheme,
+    val objectShape:    ObjectShape,
+    val subBands:       Int,
+    val noiseGateDb:    Float,
+    val mirrorMode:     MirrorMode  = MirrorMode.OFF,
+    val trailLength:    Int         = 0,
+    val beatSensitivity:Float       = 1.3f,
+    val colorAnimSpeed: Float       = 0f,
+    val showWaveform:   Boolean     = false
 ) {
     fun toSettings(base: Settings) = base.copy(
-        bandCount      = bandCount,
-        lifetimeMs     = lifetimeMs,
-        circlesPerBand = circlesPerBand,
-        minRadiusPx    = minRadiusPx,
-        maxRadiusPx    = maxRadiusPx,
-        placement      = placement,
-        sensitivity    = sensitivity,
-        colorScheme    = colorScheme,
-        objectShape    = objectShape,
-        subBands       = subBands,
-        noiseGateDb    = noiseGateDb,
-        bandColors     = emptyMap()   // presets don't include custom band colours
+        bandCount       = bandCount,
+        lifetimeMs      = lifetimeMs,
+        circlesPerBand  = circlesPerBand,
+        minRadiusPx     = minRadiusPx,
+        maxRadiusPx     = maxRadiusPx,
+        placement       = placement,
+        sensitivity     = sensitivity,
+        colorScheme     = colorScheme,
+        objectShape     = objectShape,
+        subBands        = subBands,
+        noiseGateDb     = noiseGateDb,
+        mirrorMode      = mirrorMode,
+        trailLength     = trailLength,
+        beatSensitivity = beatSensitivity,
+        colorAnimSpeed  = colorAnimSpeed,
+        showWaveform    = showWaveform,
+        bandColors      = emptyMap()
     )
 }
 
 fun Settings.toPreset(name: String) = NamedPreset(
-    name           = name,
-    bandCount      = bandCount,
-    lifetimeMs     = lifetimeMs,
-    circlesPerBand = circlesPerBand,
-    minRadiusPx    = minRadiusPx,
-    maxRadiusPx    = maxRadiusPx,
-    placement      = placement,
-    sensitivity    = sensitivity,
-    colorScheme    = colorScheme,
-    objectShape    = objectShape,
-    subBands       = subBands,
-    noiseGateDb    = noiseGateDb
+    name            = name,
+    bandCount       = bandCount,
+    lifetimeMs      = lifetimeMs,
+    circlesPerBand  = circlesPerBand,
+    minRadiusPx     = minRadiusPx,
+    maxRadiusPx     = maxRadiusPx,
+    placement       = placement,
+    sensitivity     = sensitivity,
+    colorScheme     = colorScheme,
+    objectShape     = objectShape,
+    subBands        = subBands,
+    noiseGateDb     = noiseGateDb,
+    mirrorMode      = mirrorMode,
+    trailLength     = trailLength,
+    beatSensitivity = beatSensitivity,
+    colorAnimSpeed  = colorAnimSpeed,
+    showWaveform    = showWaveform
 )
 
 // ── Preset persistence ────────────────────────────────────────────────────────
 
-private const val PREFS_PRESETS  = "chromasound_presets"
-private const val MAX_PRESETS    = 10
+private const val PREFS_PRESETS = "chromasound_presets"
+private const val MAX_PRESETS   = 10
 
 fun loadPresets(context: Context): List<NamedPreset> {
     val prefs = context.getSharedPreferences(PREFS_PRESETS, Context.MODE_PRIVATE)
@@ -95,20 +110,29 @@ fun loadPresets(context: Context): List<NamedPreset> {
     return (0 until count).mapNotNull { i ->
         try {
             NamedPreset(
-                name           = prefs.getString("${i}_name", null) ?: return@mapNotNull null,
-                bandCount      = prefs.getInt("${i}_bandCount", 16),
-                lifetimeMs     = prefs.getLong("${i}_lifetimeMs", 500L),
-                circlesPerBand = prefs.getInt("${i}_circlesPerBand", 1),
-                minRadiusPx    = prefs.getFloat("${i}_minRadiusPx", 10f),
-                maxRadiusPx    = prefs.getFloat("${i}_maxRadiusPx", 160f),
-                placement      = prefs.getFloat("${i}_placement", 0.3f),
-                sensitivity    = prefs.getFloat("${i}_sensitivity", 1.0f),
-                colorScheme    = ColorScheme.valueOf(
-                    prefs.getString("${i}_colorScheme", ColorScheme.RAINBOW.name) ?: ColorScheme.RAINBOW.name),
-                objectShape    = ObjectShape.valueOf(
-                    prefs.getString("${i}_objectShape", ObjectShape.CIRCLE.name) ?: ObjectShape.CIRCLE.name),
-                subBands       = prefs.getInt("${i}_subBands", 4),
-                noiseGateDb    = prefs.getFloat("${i}_noiseGateDb", -50f)
+                name            = prefs.getString("${i}_name", null) ?: return@mapNotNull null,
+                bandCount       = prefs.getInt("${i}_bandCount",        16),
+                lifetimeMs      = prefs.getLong("${i}_lifetimeMs",      500L),
+                circlesPerBand  = prefs.getInt("${i}_circlesPerBand",   1),
+                minRadiusPx     = prefs.getFloat("${i}_minRadiusPx",    10f),
+                maxRadiusPx     = prefs.getFloat("${i}_maxRadiusPx",    160f),
+                placement       = prefs.getFloat("${i}_placement",      0.3f),
+                sensitivity     = prefs.getFloat("${i}_sensitivity",    1.0f),
+                colorScheme     = try { ColorScheme.valueOf(
+                    prefs.getString("${i}_colorScheme", ColorScheme.RAINBOW.name)!!)
+                } catch (_: Exception) { ColorScheme.RAINBOW },
+                objectShape     = try { ObjectShape.valueOf(
+                    prefs.getString("${i}_objectShape", ObjectShape.CIRCLE.name)!!)
+                } catch (_: Exception) { ObjectShape.CIRCLE },
+                subBands        = prefs.getInt("${i}_subBands",         4),
+                noiseGateDb     = prefs.getFloat("${i}_noiseGateDb",    -50f),
+                mirrorMode      = try { MirrorMode.valueOf(
+                    prefs.getString("${i}_mirrorMode", MirrorMode.OFF.name)!!)
+                } catch (_: Exception) { MirrorMode.OFF },
+                trailLength     = prefs.getInt("${i}_trailLength",      0),
+                beatSensitivity = prefs.getFloat("${i}_beatSensitivity",1.3f),
+                colorAnimSpeed  = prefs.getFloat("${i}_colorAnimSpeed", 0f),
+                showWaveform    = prefs.getBoolean("${i}_showWaveform", false)
             )
         } catch (_: Exception) { null }
     }
@@ -120,18 +144,23 @@ fun savePresets(context: Context, presets: List<NamedPreset>) {
         clear()
         putInt("count", presets.size)
         presets.forEachIndexed { i, p ->
-            putString("${i}_name",          p.name)
-            putInt("${i}_bandCount",         p.bandCount)
-            putLong("${i}_lifetimeMs",       p.lifetimeMs)
-            putInt("${i}_circlesPerBand",    p.circlesPerBand)
-            putFloat("${i}_minRadiusPx",     p.minRadiusPx)
-            putFloat("${i}_maxRadiusPx",     p.maxRadiusPx)
-            putFloat("${i}_placement",       p.placement)
-            putFloat("${i}_sensitivity",     p.sensitivity)
-            putString("${i}_colorScheme",    p.colorScheme.name)
-            putString("${i}_objectShape",    p.objectShape.name)
-            putInt("${i}_subBands",          p.subBands)
-            putFloat("${i}_noiseGateDb",     p.noiseGateDb)
+            putString("${i}_name",             p.name)
+            putInt("${i}_bandCount",           p.bandCount)
+            putLong("${i}_lifetimeMs",         p.lifetimeMs)
+            putInt("${i}_circlesPerBand",      p.circlesPerBand)
+            putFloat("${i}_minRadiusPx",       p.minRadiusPx)
+            putFloat("${i}_maxRadiusPx",       p.maxRadiusPx)
+            putFloat("${i}_placement",         p.placement)
+            putFloat("${i}_sensitivity",       p.sensitivity)
+            putString("${i}_colorScheme",      p.colorScheme.name)
+            putString("${i}_objectShape",      p.objectShape.name)
+            putInt("${i}_subBands",            p.subBands)
+            putFloat("${i}_noiseGateDb",       p.noiseGateDb)
+            putString("${i}_mirrorMode",       p.mirrorMode.name)
+            putInt("${i}_trailLength",         p.trailLength)
+            putFloat("${i}_beatSensitivity",   p.beatSensitivity)
+            putFloat("${i}_colorAnimSpeed",    p.colorAnimSpeed)
+            putBoolean("${i}_showWaveform",    p.showWaveform)
         }
         apply()
     }
@@ -150,32 +179,37 @@ val builtInThemes = listOf(
     Theme(
         name = "Neon Noir", emoji = "🌃",
         gradient = listOf(Color(0xFF7C6FFF), Color(0xFFFF6BFF), Color(0xFF6BFFFF)),
-        preset = NamedPreset("Neon Noir", 16, 600L, 1, 15f, 180f,
-            0.5f, 1.2f, ColorScheme.RAINBOW, ObjectShape.SPHERE, 6, -55f)
+        preset = NamedPreset("Neon Noir",  16, 600L,  1, 15f, 180f, 0.5f, 1.2f,
+            ColorScheme.RAINBOW, ObjectShape.SPHERE, 6, -55f,
+            MirrorMode.OFF, 0, 1.3f, 0f, false)
     ),
     Theme(
         name = "Solar Flare", emoji = "☀️",
         gradient = listOf(Color(0xFFFF6B00), Color(0xFFFFCC00), Color(0xFFFF2200)),
-        preset = NamedPreset("Solar Flare", 12, 400L, 2, 20f, 200f,
-            0.7f, 1.5f, ColorScheme.INVERSE_RAINBOW, ObjectShape.CIRCLE, 8, -50f)
+        preset = NamedPreset("Solar Flare", 12, 400L, 2, 20f, 200f, 0.7f, 1.5f,
+            ColorScheme.INVERSE_RAINBOW, ObjectShape.CIRCLE, 8, -50f,
+            MirrorMode.OFF, 0, 1.3f, 0f, false)
     ),
     Theme(
         name = "Arctic", emoji = "🧊",
         gradient = listOf(Color(0xFF42E5F5), Color(0xFF0080FF), Color(0xFFFFFFFF)),
-        preset = NamedPreset("Arctic", 20, 700L, 1, 8f, 140f,
-            0.3f, 0.9f, ColorScheme.INVERSE_RAINBOW, ObjectShape.SPHERE, 4, -52f)
+        preset = NamedPreset("Arctic",     20, 700L,  1,  8f, 140f, 0.3f, 0.9f,
+            ColorScheme.INVERSE_RAINBOW, ObjectShape.SPHERE, 4, -52f,
+            MirrorMode.HORIZONTAL, 0, 1.3f, 0.5f, false)
     ),
     Theme(
         name = "Deep Ocean", emoji = "🌊",
         gradient = listOf(Color(0xFF004466), Color(0xFF0088AA), Color(0xFF00FFCC)),
-        preset = NamedPreset("Deep Ocean", 10, 1000L, 1, 20f, 220f,
-            0.4f, 1.0f, ColorScheme.RAINBOW, ObjectShape.SPHERE, 8, -58f)
+        preset = NamedPreset("Deep Ocean", 10, 1000L, 1, 20f, 220f, 0.4f, 1.0f,
+            ColorScheme.RAINBOW, ObjectShape.SPHERE, 8, -58f,
+            MirrorMode.OFF, 3, 1.3f, 0f, false)
     ),
     Theme(
         name = "Classic", emoji = "📺",
         gradient = listOf(Color(0xFFFF0000), Color(0xFF00FF00), Color(0xFF0000FF)),
-        preset = NamedPreset("Classic", 24, 200L, 1, 10f, 120f,
-            0.0f, 1.0f, ColorScheme.RAINBOW, ObjectShape.BOX_2D, 1, -50f)
+        preset = NamedPreset("Classic",    24, 200L,  1, 10f, 120f, 0.0f, 1.0f,
+            ColorScheme.RAINBOW, ObjectShape.BOX_2D, 1, -50f,
+            MirrorMode.OFF, 0, 1.3f, 0f, false)
     )
 )
 
@@ -189,7 +223,7 @@ fun PresetsScreen(
 ) {
     val context  = LocalContext.current
     var presets  by remember { mutableStateOf(loadPresets(context)) }
-    var showSaveDialog by remember { mutableStateOf(false) }
+    var showSaveDialog    by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf<Int?>(null) }
 
     fun deletePreset(index: Int) {
@@ -201,7 +235,6 @@ fun PresetsScreen(
         if (name.isBlank()) return
         val trimmed = name.trim().take(24)
         val updated = presets.toMutableList()
-        // Replace if name already exists, otherwise append (up to max)
         val existing = updated.indexOfFirst { it.name.equals(trimmed, ignoreCase = true) }
         if (existing >= 0) {
             updated[existing] = currentSettings.toPreset(trimmed)
@@ -280,10 +313,8 @@ fun PresetsScreen(
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                 Text("MY PRESETS", color = UiSubtle, fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
-                Text(
-                    "${presets.size} / $MAX_PRESETS",
-                    color = UiAccent, fontSize = 10.sp, fontFamily = FontFamily.Monospace
-                )
+                Text("${presets.size} / $MAX_PRESETS",
+                    color = UiAccent, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
             }
             Spacer(Modifier.height(10.dp))
         }
@@ -312,8 +343,8 @@ fun PresetsScreen(
         // ── Saved preset cards ────────────────────────────────────────────────
         itemsIndexed(presets) { index, preset ->
             PresetCard(
-                preset = preset,
-                onLoad = {
+                preset  = preset,
+                onLoad  = {
                     onApplySettings(preset.toSettings(currentSettings))
                     onClose()
                 },
@@ -328,19 +359,16 @@ fun PresetsScreen(
     // ── Save name dialog ──────────────────────────────────────────────────────
     if (showSaveDialog) {
         SavePresetDialog(
-            onSave = { name ->
-                savePreset(name)
-                showSaveDialog = false
-            },
+            onSave    = { name -> savePreset(name); showSaveDialog = false },
             onDismiss = { showSaveDialog = false }
         )
     }
 
-    // ── Delete confirmation dialog ─────────────────────────────────────────────
+    // ── Delete confirmation ───────────────────────────────────────────────────
     showDeleteConfirm?.let { index ->
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = null },
-            containerColor = BgCard,
+            containerColor   = BgCard,
             title = {
                 Text("Delete Preset?", color = UiText,
                     fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
@@ -350,10 +378,7 @@ fun PresetsScreen(
                     color = UiSubtle, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
             },
             confirmButton = {
-                TextButton(onClick = {
-                    deletePreset(index)
-                    showDeleteConfirm = null
-                }) {
+                TextButton(onClick = { deletePreset(index); showDeleteConfirm = null }) {
                     Text("DELETE", color = DangerC,
                         fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                 }
@@ -381,35 +406,21 @@ private fun ThemeCard(theme: Theme, onClick: () -> Unit) {
             .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Gradient preview bar
-        Box(
-            Modifier.fillMaxWidth().height(8.dp)
-                .clip(RoundedCornerShape(50))
-                .background(Brush.horizontalGradient(theme.gradient))
-        )
+        Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50))
+            .background(Brush.horizontalGradient(theme.gradient)))
         Spacer(Modifier.height(8.dp))
         Text(theme.emoji, fontSize = 22.sp)
         Spacer(Modifier.height(4.dp))
-        Text(
-            theme.name,
-            color = UiText, fontSize = 10.sp,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Text(theme.name, color = UiText, fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 // ── Saved preset card ─────────────────────────────────────────────────────────
 
 @Composable
-private fun PresetCard(
-    preset:   NamedPreset,
-    onLoad:   () -> Unit,
-    onDelete: () -> Unit
-) {
+private fun PresetCard(preset: NamedPreset, onLoad: () -> Unit, onDelete: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -419,51 +430,27 @@ private fun PresetCard(
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Icon
-        Box(
-            Modifier.size(40.dp)
-                .background(UiAccent.copy(alpha = 0.12f), RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center
-        ) {
+        Box(Modifier.size(40.dp)
+            .background(UiAccent.copy(alpha = 0.12f), RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center) {
             Text(shapeEmoji(preset.objectShape), fontSize = 18.sp)
         }
         Spacer(Modifier.width(14.dp))
-
-        // Name + summary
         Column(Modifier.weight(1f)) {
-            Text(
-                preset.name,
-                color = UiText, fontSize = 14.sp,
+            Text(preset.name, color = UiText, fontSize = 14.sp,
                 fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
-                maxLines = 1, overflow = TextOverflow.Ellipsis
-            )
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(3.dp))
-            Text(
-                presetSummary(preset),
-                color = UiSubtle, fontSize = 10.sp,
-                fontFamily = FontFamily.Monospace, maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Text(presetSummary(preset), color = UiSubtle, fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-
         Spacer(Modifier.width(8.dp))
-
-        // Load badge
-        Text(
-            "LOAD →",
-            color = UiAccent, fontSize = 10.sp,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp
-        )
+        Text("LOAD →", color = UiAccent, fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         Spacer(Modifier.width(12.dp))
-
-        // Delete button
-        TextButton(
-            onClick = onDelete,
+        TextButton(onClick = onDelete,
             contentPadding = PaddingValues(4.dp),
-            modifier = Modifier.size(32.dp)
-        ) {
+            modifier = Modifier.size(32.dp)) {
             Text("✕", color = UiSubtle, fontSize = 14.sp)
         }
     }
@@ -472,73 +459,42 @@ private fun PresetCard(
 // ── Save dialog ───────────────────────────────────────────────────────────────
 
 @Composable
-private fun SavePresetDialog(
-    onSave:    (String) -> Unit,
-    onDismiss: () -> Unit
-) {
+private fun SavePresetDialog(onSave: (String) -> Unit, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf("") }
-
     Dialog(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(BgCard, RoundedCornerShape(16.dp))
-                .padding(24.dp)
-        ) {
-            Text(
-                "SAVE PRESET",
-                color = UiText, fontSize = 16.sp,
+        Column(Modifier.fillMaxWidth()
+            .background(BgCard, RoundedCornerShape(16.dp)).padding(24.dp)) {
+            Text("SAVE PRESET", color = UiText, fontSize = 16.sp,
                 fontFamily = FontFamily.Monospace, fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 3.sp
-            )
+                letterSpacing = 3.sp)
             Spacer(Modifier.height(6.dp))
-            Text(
-                "Give this configuration a name",
-                color = UiSubtle, fontSize = 11.sp, fontFamily = FontFamily.Monospace
-            )
+            Text("Give this configuration a name", color = UiSubtle,
+                fontSize = 11.sp, fontFamily = FontFamily.Monospace)
             Spacer(Modifier.height(16.dp))
             OutlinedTextField(
-                value = name,
-                onValueChange = { if (it.length <= 24) name = it },
-                placeholder = {
-                    Text("e.g. My Party Setup", color = UiSubtle,
-                        fontFamily = FontFamily.Monospace, fontSize = 13.sp)
-                },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                value = name, onValueChange = { if (it.length <= 24) name = it },
+                placeholder = { Text("e.g. My Party Setup", color = UiSubtle,
+                    fontFamily = FontFamily.Monospace, fontSize = 13.sp) },
+                singleLine = true, modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor   = UiAccent,
-                    unfocusedBorderColor = UiSubtle,
-                    focusedTextColor     = UiText,
-                    unfocusedTextColor   = UiText,
-                    cursorColor          = UiAccent
-                ),
+                    focusedBorderColor   = UiAccent, unfocusedBorderColor = UiSubtle,
+                    focusedTextColor     = UiText,   unfocusedTextColor   = UiText,
+                    cursorColor          = UiAccent),
                 textStyle = androidx.compose.ui.text.TextStyle(
-                    fontFamily = FontFamily.Monospace, fontSize = 13.sp
-                )
+                    fontFamily = FontFamily.Monospace, fontSize = 13.sp)
             )
             Spacer(Modifier.height(6.dp))
-            Text(
-                "${name.length}/24",
-                color = UiSubtle, fontSize = 10.sp,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.align(Alignment.End)
-            )
+            Text("${name.length}/24", color = UiSubtle, fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace, modifier = Modifier.align(Alignment.End))
             Spacer(Modifier.height(20.dp))
             Row(Modifier.fillMaxWidth(), Arrangement.End, Alignment.CenterVertically) {
                 TextButton(onClick = onDismiss) {
-                    Text("CANCEL", color = UiSubtle, fontFamily = FontFamily.Monospace)
-                }
+                    Text("CANCEL", color = UiSubtle, fontFamily = FontFamily.Monospace) }
                 Spacer(Modifier.width(12.dp))
-                Button(
-                    onClick = { if (name.isNotBlank()) onSave(name) },
-                    enabled = name.isNotBlank(),
-                    shape = RoundedCornerShape(50),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = UiAccent,
-                        disabledContainerColor = UiSubtle.copy(alpha = 0.3f)
-                    )
-                ) {
+                Button(onClick = { if (name.isNotBlank()) onSave(name) },
+                    enabled = name.isNotBlank(), shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(containerColor = UiAccent,
+                        disabledContainerColor = UiSubtle.copy(alpha = 0.3f))) {
                     Text("SAVE", fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                 }
@@ -550,17 +506,15 @@ private fun SavePresetDialog(
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
 private fun shapeEmoji(shape: ObjectShape) = when (shape) {
-    ObjectShape.CIRCLE -> "●"
-    ObjectShape.STAR   -> "★"
-    ObjectShape.BOX_2D -> "■"
-    ObjectShape.BOX_3D -> "⬡"
-    ObjectShape.SPHERE -> "◉"
+    ObjectShape.CIRCLE -> "●"; ObjectShape.STAR -> "★"; ObjectShape.BOX_2D -> "■"
+    ObjectShape.BOX_3D -> "⬡"; ObjectShape.SPHERE -> "◉"
 }
 
 private fun presetSummary(p: NamedPreset): String {
     val scheme = if (p.colorScheme == ColorScheme.RAINBOW) "Rainbow" else "Inverse"
     val shape  = p.objectShape.name.lowercase().replace("_", " ")
         .replaceFirstChar { it.uppercase() }
-    val ms     = if (p.lifetimeMs >= 1000) "${"%.1f".format(p.lifetimeMs / 1000.0)}s" else "${p.lifetimeMs}ms"
-    return "${p.bandCount} bands  ·  $ms  ·  $shape  ·  $scheme"
+    val ms     = if (p.lifetimeMs >= 1000) "${"%.1f".format(p.lifetimeMs/1000.0)}s"
+                 else "${p.lifetimeMs}ms"
+    return "${p.bandCount} bands · $ms · $shape · $scheme"
 }
