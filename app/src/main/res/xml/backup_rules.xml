@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android Auto Backup rules for ChromaSound.
+    Backed up to Google Drive automatically (up to 25 MB, free).
+    Restored on reinstall or new device.
+
+    Included:
+      - chromasound_presets   : all saved user presets
+      - chromasound_settings  : all user settings (sensitivity, shapes, etc.)
+
+    Both are SharedPreferences files stored in the app's private storage.
+    The backup runs automatically when the device is idle, charging, and on Wi-Fi.
+-->
+<full-backup-content>
+    <include domain="sharedpref" path="chromasound_presets.xml" />
+    <include domain="sharedpref" path="chromasound_settings.xml" />
+</full-backup-content>

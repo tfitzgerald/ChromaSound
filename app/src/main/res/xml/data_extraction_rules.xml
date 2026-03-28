@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 12+ (API 31+) backup and data transfer rules for ChromaSound.
+    Works alongside backup_rules.xml which covers older Android versions.
+
+    cloud-backup : Google Drive Auto Backup
+    device-transfer : phone-to-phone transfer (e.g. Setup Wizard)
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="sharedpref" path="chromasound_presets.xml" />
+        <include domain="sharedpref" path="chromasound_settings.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="sharedpref" path="chromasound_presets.xml" />
+        <include domain="sharedpref" path="chromasound_settings.xml" />
+    </device-transfer>
+</data-extraction-rules>
