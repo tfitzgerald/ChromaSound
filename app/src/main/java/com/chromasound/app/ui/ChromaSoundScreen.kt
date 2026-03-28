@@ -457,9 +457,12 @@ private fun VisualizerCanvas(
 
         // ── 0. Background ─────────────────────────────────────────────────
         when (backgroundEffect) {
+            // Canvas background is ALWAYS near-black regardless of theme.
+            // Light theme applies to UI chrome (settings, HUD cards) but the
+            // visualiser canvas is always a dark stage — shapes use BlendMode.Screen
+            // which requires a dark background to glow correctly.
             BackgroundEffect.BLOOM -> {
-                val bgC = if (isDark) Color(0xFF050508) else Color(0xFFF5F5FA)
-                drawRect(color = bgC)
+                drawRect(color = Color(0xFF050508))
                 // Amplify RMS heavily — raw values are 0.002–0.05 so we need 20x to see anything
                 val bloom = (rmsVolume * 20f).coerceIn(0f, 1f) * 0.18f
                 drawRect(brush = Brush.radialGradient(
@@ -469,10 +472,7 @@ private fun VisualizerCanvas(
                 ))
             }
             BackgroundEffect.NOISE -> {
-                val bgC = if (isDark) Color(0xFF050508) else Color(0xFFF5F5FA)
-                drawRect(color = bgC)
-                // Chromatic noise — animated grain giving the display depth
-                // Use nowMs bucketed to ~30fps so grain animates visibly
+                drawRect(color = Color(0xFF050508))
                 val rng = kotlin.random.Random(nowMs / 33L)
                 repeat(400) {
                     val nx = rng.nextFloat() * w
@@ -481,9 +481,8 @@ private fun VisualizerCanvas(
                         red   = rng.nextFloat(),
                         green = rng.nextFloat(),
                         blue  = rng.nextFloat(),
-                        alpha = 0.08f + rng.nextFloat() * 0.12f  // 0.08–0.20, clearly visible
+                        alpha = 0.08f + rng.nextFloat() * 0.12f
                     )
-                    // Larger dots: 1.5–4px radius so they're actually visible on screen
                     drawCircle(
                         color  = nc,
                         radius = 1.5f + rng.nextFloat() * 2.5f,
@@ -492,24 +491,18 @@ private fun VisualizerCanvas(
                 }
             }
             BackgroundEffect.STARFIELD -> {
-                val bgC = if (isDark) Color(0xFF050508) else Color(0xFFF5F5FA)
-                drawRect(color = bgC)
-                // Star colour adapts to theme: white on dark, dark purple on light
-                val starColor = if (isDark) Color.White else Color(0xFF5B4ECC)
+                drawRect(color = Color(0xFF050508))
                 stars.forEach { star ->
                     star.y += star.speed
                     if (star.y > 1f) { star.y = 0f; star.x = kotlin.random.Random.nextFloat() }
                     drawCircle(
-                        color  = starColor.copy(alpha = 0.25f + star.size * 0.15f),
+                        color  = Color.White.copy(alpha = 0.25f + star.size * 0.15f),
                         radius = star.size,
                         center = Offset(star.x * w, star.y * h)
                     )
                 }
             }
-            BackgroundEffect.NONE -> {
-                val bgC = if (isDark) Color(0xFF050508) else Color(0xFFF5F5FA)
-                drawRect(color = bgC)
-            }
+            BackgroundEffect.NONE -> drawRect(color = Color(0xFF050508))
         }
 
         val laneW = w / bandCount
@@ -656,7 +649,7 @@ private fun VisualizerCanvas(
                     radius    = r,
                     center    = Offset(cx, cy),
                     style     = Stroke(width = 2.5f),
-                    blendMode = theme.shapeBlend
+                    blendMode = BlendMode.Screen
                 )
             } else {
                 drawShape(shifted, life, shape, angleRad)
