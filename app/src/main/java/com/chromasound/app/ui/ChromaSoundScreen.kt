@@ -93,7 +93,11 @@ fun ChromaSoundScreen(
                         onScreenshot    = onScreenshotRequested
                     )
                 ChromaSoundUiState.PermissionDenied -> PermissionDeniedScreen()
-                else -> IdleScreen(onStartRequested)
+                else -> IdleScreen(
+                    onStart    = onStartRequested,
+                    onSettings = { showSettings = true },
+                    onPresets  = { showPresets = true }
+                )
             }
         }
     }
@@ -101,7 +105,11 @@ fun ChromaSoundScreen(
 
 // ── Idle ──────────────────────────────────────────────────────────────────────
 @Composable
-private fun IdleScreen(onStart: () -> Unit) {
+private fun IdleScreen(
+    onStart:    () -> Unit,
+    onSettings: () -> Unit = {},
+    onPresets:  () -> Unit = {}
+) {
     val pulse = rememberInfiniteTransition(label = "pulse")
     val scale by pulse.animateFloat(
         initialValue = 0.92f, targetValue = 1.08f,
@@ -136,6 +144,30 @@ private fun IdleScreen(onStart: () -> Unit) {
         ) {
             Text("TAP TO LISTEN", fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold, letterSpacing = 3.sp, fontSize = 13.sp)
+        }
+        Spacer(Modifier.height(20.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(
+                onClick = onPresets,
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = UiAccent),
+                border = androidx.compose.foundation.BorderStroke(1.dp, UiAccent.copy(alpha = 0.5f)),
+                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
+            ) {
+                Text("PRESETS", fontFamily = FontFamily.Monospace,
+                    fontSize = 12.sp, letterSpacing = 2.sp)
+            }
+            OutlinedButton(
+                onClick = onSettings,
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = UiSubtle),
+                border = androidx.compose.foundation.BorderStroke(1.dp, UiSubtle.copy(alpha = 0.4f)),
+                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
+            ) {
+                Text("SETTINGS", fontFamily = FontFamily.Monospace,
+                    fontSize = 12.sp, letterSpacing = 2.sp)
+            }
         }
     }
 }
@@ -816,11 +848,13 @@ private fun RmsHistoryGraph(rmsVolume: Float, modifier: Modifier = Modifier) {
         // Bars — oldest on left, newest on right
         history.forEachIndexed { i, rms ->
             val x      = i * barW + gap / 2f
-            val barH   = (rms * h).coerceAtLeast(1.5f)
-            val alpha  = 0.4f + (i.toFloat() / 32f) * 0.6f  // fade older bars
+                        // Amplify 8x — raw RMS is typically 0.002-0.1, invisible at 1x
+            val amp    = (rms * 8f).coerceIn(0f, 1f)
+            val barH   = (amp * h).coerceAtLeast(2f)
+            val alpha  = 0.5f + (i.toFloat() / 32f) * 0.5f  // fade older bars
             val color  = when {
-                rms > 0.7f -> Color(0xFFFF6B6B).copy(alpha = alpha) // loud  = red
-                rms > 0.3f -> Color(0xFF7C6FFF).copy(alpha = alpha) // mid   = purple
+                amp > 0.7f -> Color(0xFFFF6B6B).copy(alpha = alpha) // loud  = red
+                amp > 0.3f -> Color(0xFF7C6FFF).copy(alpha = alpha) // mid   = purple
                 else       -> Color(0xFF42E5F5).copy(alpha = alpha) // quiet = cyan
             }
             drawRect(color = color,

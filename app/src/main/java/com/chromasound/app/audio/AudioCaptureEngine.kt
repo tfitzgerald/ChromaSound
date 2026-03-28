@@ -191,7 +191,7 @@ class AudioCaptureEngine {
                     }
                     val sorted = intervals.sorted()
                     val medianInterval = sorted[sorted.size / 2]
-                    if (medianInterval > 0) (60_000f / medianInterval).coerceIn(40f, 240f) else 0f
+                    if (medianInterval > 0) (60_000f / medianInterval).coerceIn(20f, 240f) else 0f
                 } else 0f
 
                 // ── Waveform downsample ───────────────────────────────────────
