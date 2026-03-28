@@ -55,11 +55,10 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
     private val _uiState = MutableStateFlow<ChromaSoundUiState>(ChromaSoundUiState.Idle)
     val uiState: StateFlow<ChromaSoundUiState> = _uiState.asStateFlow()
 
-    // Waveform kept separate from UiState — FloatArray inside a data class uses
-    // reference equality so Compose never sees content changes. A dedicated StateFlow
-    // wrapping a new FloatArray reference each frame forces recomposition correctly.
-    private val _waveformSamples = MutableStateFlow(FloatArray(0))
-    val waveformSamples: StateFlow<FloatArray> = _waveformSamples.asStateFlow()
+    // Waveform kept as List<Float> — List has structural equality so Compose
+    // correctly detects content changes and recomposes the canvas each frame.
+    private val _waveformSamples = MutableStateFlow<List<Float>>(emptyList())
+    val waveformSamples: StateFlow<List<Float>> = _waveformSamples.asStateFlow()
 
     private val _settings = MutableStateFlow(Settings())
     val settings: StateFlow<Settings> = _settings.asStateFlow()
@@ -285,9 +284,9 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
         val alive       = bandSlots.flatMap { it.filterNotNull() }
         val loudest     = alive.maxByOrNull { it.decibelLevel }
 
-        // Update waveform in its own StateFlow — new FloatArray reference each frame
-        // guarantees Compose detects the change regardless of content equality
-        _waveformSamples.value = frame.waveformSamples
+        // Convert to List<Float> — structural equality ensures Compose detects
+        // the change every frame and recomposes the waveform canvas
+        _waveformSamples.value = frame.waveformSamples.toList()
 
         _uiState.value = ChromaSoundUiState.Running(
             circles         = alive,

@@ -41,7 +41,7 @@ private val UiSubtle = Color(0xFF5A5870)
 fun ChromaSoundScreen(
     uiState:          ChromaSoundUiState,
     settings:         Settings,
-    waveformSamples:  FloatArray,
+    waveformSamples:  List<Float>,
     onStartRequested: () -> Unit,
     onStopRequested:  () -> Unit,
     onSettingsChange: (Settings) -> Unit
@@ -147,7 +147,7 @@ private fun RunningScreen(
     trailLength:     Int,
     colorAnimSpeed:  Float,
     showWaveform:    Boolean,
-    waveformSamples: FloatArray,
+    waveformSamples: List<Float>,
     onStop:          () -> Unit,
     onSettings:      () -> Unit
 ) {
@@ -199,7 +199,7 @@ private fun VisualizerCanvas(
     beatPulseMs:     Long,
     colorAnimSpeed:  Float,
     showWaveform:    Boolean,
-    waveformSamples: FloatArray,
+    waveformSamples: List<Float>,
     modifier:        Modifier = Modifier
 ) {
     var nowMs        by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -271,37 +271,34 @@ private fun VisualizerCanvas(
         }
 
         // ── 3. Waveform overlay ───────────────────────────────────────────────
-        if (showWaveform && waveformSamples.isNotEmpty()) {
-            val waveH    = h * 0.12f          // 12% of screen height
-            val waveTop  = h - waveH - h * 0.08f
+        if (showWaveform && waveformSamples.size > 1) {
+            val waveH    = h * 0.15f             // 15% of screen height
+            val waveMid  = h - waveH * 0.5f - h * 0.06f  // centre line Y
             val stepX    = w / (waveformSamples.size - 1).toFloat()
-            val waveColor = Color(0xFF7C6FFF).copy(alpha = 0.55f)
-            // Glow pass (wider, more transparent)
+            // Glow pass — wide soft halo
             for (i in 0 until waveformSamples.size - 1) {
                 val x1 = i * stepX
                 val x2 = (i + 1) * stepX
-                val y1 = waveTop + waveH * 0.5f - waveformSamples[i] * waveH * 0.45f
-                val y2 = waveTop + waveH * 0.5f - waveformSamples[i + 1] * waveH * 0.45f
+                val y1 = waveMid - waveformSamples[i]  * waveH * 0.45f
+                val y2 = waveMid - waveformSamples[i+1] * waveH * 0.45f
                 drawLine(
-                    color       = Color(0xFF7C6FFF).copy(alpha = 0.15f),
+                    color       = Color(0xFF7C6FFF).copy(alpha = 0.25f),
                     start       = Offset(x1, y1),
                     end         = Offset(x2, y2),
-                    strokeWidth = 6f,
-                    blendMode   = BlendMode.Screen
+                    strokeWidth = 8f
                 )
             }
-            // Core line pass
+            // Core line — bright sharp stroke
             for (i in 0 until waveformSamples.size - 1) {
                 val x1 = i * stepX
                 val x2 = (i + 1) * stepX
-                val y1 = waveTop + waveH * 0.5f - waveformSamples[i] * waveH * 0.45f
-                val y2 = waveTop + waveH * 0.5f - waveformSamples[i + 1] * waveH * 0.45f
+                val y1 = waveMid - waveformSamples[i]  * waveH * 0.45f
+                val y2 = waveMid - waveformSamples[i+1] * waveH * 0.45f
                 drawLine(
-                    color       = waveColor,
+                    color       = Color(0xFFAA99FF),
                     start       = Offset(x1, y1),
                     end         = Offset(x2, y2),
-                    strokeWidth = 1.5f,
-                    blendMode   = BlendMode.Screen
+                    strokeWidth = 2f
                 )
             }
         }

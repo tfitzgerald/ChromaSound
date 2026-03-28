@@ -41,9 +41,8 @@ class MainActivity : ComponentActivity() {
             Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF050508)) {
                 val uiState         by viewModel.uiState.collectAsState()
                 val settings        by viewModel.settings.collectAsState()
-                // Collected separately so each new FloatArray reference triggers
-                // recomposition — FloatArray inside a data class uses reference
-                // equality so embedding it in UiState caused the waveform to freeze.
+                // List<Float> has structural equality so Compose correctly detects
+                // content changes each audio frame and recomposes the waveform.
                 val waveformSamples by viewModel.waveformSamples.collectAsState()
 
                 val permissionLauncher = rememberLauncherForActivityResult(
