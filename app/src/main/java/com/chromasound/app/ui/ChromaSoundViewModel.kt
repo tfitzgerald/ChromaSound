@@ -2,6 +2,10 @@ package com.chromasound.app.ui
 
 import android.app.Application
 import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.chromasound.app.audio.AudioCaptureEngine
@@ -69,6 +73,15 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
         Array(BandDefinition.DEFAULT_BANDS) { arrayOfNulls<FrequencyCircle>(1) }
 
     private var captureJob: Job? = null
+
+    // Haptic feedback — obtained once, reused on every beat
+    @Suppress("DEPRECATION")
+    private val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        (application.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)
+            ?.defaultVibrator
+    } else {
+        application.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+    }
 
     // SharedPreferences key for settings persistence
     private val prefs = application.getSharedPreferences("chromasound_settings", Context.MODE_PRIVATE)
@@ -278,6 +291,18 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
                 decibelLevel    = db,
                 subBandEnergies = subEnergies
             )
+        }
+
+        // Haptic pulse on beat — 40ms sharp thump, no queuing
+        if (frame.isBeat) {
+            vibrator?.let { v ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    v.vibrate(VibrationEffect.createOneShot(40L, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    v.vibrate(40L)
+                }
+            }
         }
 
         val prevState   = _uiState.value as? ChromaSoundUiState.Running

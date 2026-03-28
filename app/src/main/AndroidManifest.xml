@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-feature android:name="android.hardware.microphone" android:required="true" />
 
+    <!-- Haptic feedback on beat detection — normal permission, no user prompt needed -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <!-- Photo gallery write access for screenshot export (Android 9 and below) -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
