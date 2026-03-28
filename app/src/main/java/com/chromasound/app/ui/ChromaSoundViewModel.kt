@@ -14,6 +14,7 @@ import com.chromasound.app.model.BandDefinition
 import com.chromasound.app.model.ColorScheme
 import com.chromasound.app.model.FrequencyCircle
 import com.chromasound.app.model.MirrorMode
+import com.chromasound.app.model.ObjectShape
 import com.chromasound.app.model.Settings
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
