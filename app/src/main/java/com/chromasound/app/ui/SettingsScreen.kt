@@ -131,22 +131,31 @@ fun SettingsScreen(
 
         // ── SECTION: FREQUENCY & TIMING ──────────────────────────────────────────
         item {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
             Row(
-                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(Modifier.weight(1f).height(1.dp).background(
-                    Brush.horizontalGradient(listOf(Color.Transparent, UiAccent.copy(alpha=0.3f)))
-                ))
-                Text("  FREQUENCY & TIMING  ", color = UiAccent.copy(alpha=0.8f), fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp)
-                Box(Modifier.weight(1f).height(1.dp).background(
-                    Brush.horizontalGradient(listOf(UiAccent.copy(alpha=0.3f), Color.Transparent))
-                ))
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = UiAccent.copy(alpha = 0.3f),
+                    thickness = 1.dp
+                )
+                Text(
+                    "  FREQUENCY & TIMING  ",
+                    color = UiAccent,
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                )
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = UiAccent.copy(alpha = 0.3f),
+                    thickness = 1.dp
+                )
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
         }
 
         // ── 1. Frequency bands ────────────────────────────────────────────────
@@ -191,22 +200,31 @@ fun SettingsScreen(
 
         // ── SECTION: SIZE & POSITION ──────────────────────────────────────────
         item {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
             Row(
-                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(Modifier.weight(1f).height(1.dp).background(
-                    Brush.horizontalGradient(listOf(Color.Transparent, UiAccent.copy(alpha=0.3f)))
-                ))
-                Text("  SIZE & POSITION  ", color = UiAccent.copy(alpha=0.8f), fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp)
-                Box(Modifier.weight(1f).height(1.dp).background(
-                    Brush.horizontalGradient(listOf(UiAccent.copy(alpha=0.3f), Color.Transparent))
-                ))
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = UiAccent.copy(alpha = 0.3f),
+                    thickness = 1.dp
+                )
+                Text(
+                    "  SIZE & POSITION  ",
+                    color = UiAccent,
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                )
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = UiAccent.copy(alpha = 0.3f),
+                    thickness = 1.dp
+                )
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
         }
 
         // ── 4. Minimum circle size ────────────────────────────────────────────
@@ -251,22 +269,31 @@ fun SettingsScreen(
 
         // ── SECTION: AUDIO ──────────────────────────────────────────
         item {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
             Row(
-                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(Modifier.weight(1f).height(1.dp).background(
-                    Brush.horizontalGradient(listOf(Color.Transparent, UiAccent.copy(alpha=0.3f)))
-                ))
-                Text("  AUDIO  ", color = UiAccent.copy(alpha=0.8f), fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp)
-                Box(Modifier.weight(1f).height(1.dp).background(
-                    Brush.horizontalGradient(listOf(UiAccent.copy(alpha=0.3f), Color.Transparent))
-                ))
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = UiAccent.copy(alpha = 0.3f),
+                    thickness = 1.dp
+                )
+                Text(
+                    "  AUDIO  ",
+                    color = UiAccent,
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                )
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = UiAccent.copy(alpha = 0.3f),
+                    thickness = 1.dp
+                )
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
         }
 
         // ── 7. Microphone sensitivity ─────────────────────────────────────────
@@ -300,22 +327,31 @@ fun SettingsScreen(
 
         // ── SECTION: VISUAL ──────────────────────────────────────────
         item {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
             Row(
-                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(Modifier.weight(1f).height(1.dp).background(
-                    Brush.horizontalGradient(listOf(Color.Transparent, UiAccent.copy(alpha=0.3f)))
-                ))
-                Text("  VISUAL  ", color = UiAccent.copy(alpha=0.8f), fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp)
-                Box(Modifier.weight(1f).height(1.dp).background(
-                    Brush.horizontalGradient(listOf(UiAccent.copy(alpha=0.3f), Color.Transparent))
-                ))
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = UiAccent.copy(alpha = 0.3f),
+                    thickness = 1.dp
+                )
+                Text(
+                    "  VISUAL  ",
+                    color = UiAccent,
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                )
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = UiAccent.copy(alpha = 0.3f),
+                    thickness = 1.dp
+                )
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
         }
 
         // ── 8. Sub-band shading ───────────────────────────────────────────────
@@ -426,22 +462,31 @@ fun SettingsScreen(
 
         // ── SECTION: EFFECTS ──────────────────────────────────────────
         item {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
             Row(
-                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(Modifier.weight(1f).height(1.dp).background(
-                    Brush.horizontalGradient(listOf(Color.Transparent, UiAccent.copy(alpha=0.3f)))
-                ))
-                Text("  EFFECTS  ", color = UiAccent.copy(alpha=0.8f), fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp)
-                Box(Modifier.weight(1f).height(1.dp).background(
-                    Brush.horizontalGradient(listOf(UiAccent.copy(alpha=0.3f), Color.Transparent))
-                ))
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = UiAccent.copy(alpha = 0.3f),
+                    thickness = 1.dp
+                )
+                Text(
+                    "  EFFECTS  ",
+                    color = UiAccent,
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                )
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = UiAccent.copy(alpha = 0.3f),
+                    thickness = 1.dp
+                )
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
         }
 
         // ── Mirror mode ───────────────────────────────────────────────────────
@@ -724,7 +769,7 @@ fun SettingsScreen(
             }
             Spacer(Modifier.height(20.dp))
             Text(
-                "ChromaSound  ·  Version 1.5.0",
+                "ChromaSound  ·  Version 1.5.4",
                 color = UiSubtle.copy(alpha = 0.6f),
                 fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace,

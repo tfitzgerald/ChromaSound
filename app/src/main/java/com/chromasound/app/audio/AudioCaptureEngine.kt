@@ -162,16 +162,21 @@ class AudioCaptureEngine {
                 }
 
                 // ── Beat detection ────────────────────────────────────────────
-                // Maintain rolling RMS history
+                // Compute average BEFORE adding current frame so the current
+                // frame isn't contaminating its own comparison baseline.
+                val avgRms = if (rmsHistory.size >= 4)
+                    rmsHistory.average().toFloat()
+                else rms * 0.5f  // bootstrap: assume current is loud until we have history
+
+                // Add current frame to history after computing average
                 rmsHistory.addLast(rms)
                 if (rmsHistory.size > 43) rmsHistory.removeFirst()
 
-                val avgRms   = if (rmsHistory.size > 1) rmsHistory.average().toFloat() else rms
-                val nowMs    = System.currentTimeMillis()
-                val thresh   = beatSensitivity().coerceIn(1.1f, 2.5f)
-                val isBeat   = rms > avgRms * thresh
-                              && rms > SILENCE_THRESHOLD * 3f
-                              && (nowMs - lastBeatMs) > minBeatGapMs
+                val nowMs  = System.currentTimeMillis()
+                val thresh = beatSensitivity().coerceIn(1.1f, 2.5f)
+                val isBeat = rms > avgRms * thresh
+                          && rms > SILENCE_THRESHOLD * 4f
+                          && (nowMs - lastBeatMs) > minBeatGapMs
 
                 if (isBeat) {
                     lastBeatMs = nowMs
@@ -179,12 +184,13 @@ class AudioCaptureEngine {
                     if (beatTimesMs.size > 8) beatTimesMs.removeFirst()
                 }
 
-                // BPM from median interval of recent beats
+                // BPM: calculate from median interval of last beats (need at least 2)
                 val bpm = if (beatTimesMs.size >= 2) {
                     val intervals = (1 until beatTimesMs.size).map {
                         (beatTimesMs[it] - beatTimesMs[it - 1]).toFloat()
                     }
-                    val medianInterval = intervals.sorted()[intervals.size / 2]
+                    val sorted = intervals.sorted()
+                    val medianInterval = sorted[sorted.size / 2]
                     if (medianInterval > 0) (60_000f / medianInterval).coerceIn(40f, 240f) else 0f
                 } else 0f
 

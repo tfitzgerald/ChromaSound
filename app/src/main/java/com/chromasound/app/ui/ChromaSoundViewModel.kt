@@ -273,19 +273,21 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
             )
         }
 
-        val alive   = bandSlots.flatMap { it.filterNotNull() }
-        val loudest = alive.maxByOrNull { it.decibelLevel }
+        val prevState   = _uiState.value as? ChromaSoundUiState.Running
+        val alive       = bandSlots.flatMap { it.filterNotNull() }
+        val loudest     = alive.maxByOrNull { it.decibelLevel }
 
         _uiState.value = ChromaSoundUiState.Running(
-            circles     = alive,
-            rmsVolume   = frame.rmsVolume,
-            activeCount = alive.size,
-            bandCount   = bd.count,
-            peakHz      = loudest?.let { formatHz(it.centreHz) } ?: "—",
-            peakDb      = loudest?.let { "${"%.1f".format(it.decibelLevel)} dB" } ?: "—",
-            bpm            = frame.bpm,
-            beatPulseMs    = if (frame.isBeat) System.currentTimeMillis() else
-                (_uiState.value as? ChromaSoundUiState.Running)?.beatPulseMs ?: 0L,
+            circles         = alive,
+            rmsVolume       = frame.rmsVolume,
+            activeCount     = alive.size,
+            bandCount       = bd.count,
+            peakHz          = loudest?.let { formatHz(it.centreHz) } ?: "—",
+            peakDb          = loudest?.let { "${"%.1f".format(it.decibelLevel)} dB" } ?: "—",
+            // Keep last known BPM — only update when engine reports a new non-zero value
+            bpm             = if (frame.bpm > 0f) frame.bpm else prevState?.bpm ?: 0f,
+            beatPulseMs     = if (frame.isBeat) System.currentTimeMillis()
+                              else prevState?.beatPulseMs ?: 0L,
             waveformSamples = frame.waveformSamples
         )
     }
