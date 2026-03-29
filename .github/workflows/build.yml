@@ -1,4 +1,4 @@
-name: Build ChromaSound APK
+name: Build ChromaSound
 
 # ── Triggers ──────────────────────────────────────────────────────────────────
 # No local tools needed — GitHub's cloud does 100% of the build work.
@@ -9,14 +9,14 @@ on:
     branches: [ "main" ]              # Build check on PRs
   workflow_dispatch:                  # Manual trigger from GitHub Actions UI
   release:
-    types: [ created ]                # Signed release APK when you publish a release
+    types: [ created ]                # Signed release AAB when you publish a release
 
 permissions:
   contents: write
 
 jobs:
   build:
-    name: Build APK
+    name: Build ChromaSound
     runs-on: ubuntu-latest
     # ── Use the official Gradle+JDK17 Docker image ──────────────────────────
     # This contains Java 17 and Gradle 8.6 pre-installed.
@@ -66,7 +66,6 @@ jobs:
           restore-keys: gradle-
 
       # ── 5. Build DEBUG APK ─────────────────────────────────────────────────
-      # Calls gradle directly — no ./gradlew wrapper needed
       - name: Build Debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
         env:
@@ -81,36 +80,37 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
 
-      # ── 7. Build SIGNED RELEASE APK (release events + manual trigger) ──────
-      # Requires 4 GitHub Secrets — see README for setup instructions
+      # ── 7. Build SIGNED RELEASE AAB for Google Play ────────────────────────
+      # Requires 4 GitHub Secrets: KEYSTORE_BASE64, KEYSTORE_PASSWORD,
+      # KEY_ALIAS, KEY_PASSWORD — see README for setup instructions.
+      # Only runs on release events or manual workflow_dispatch triggers.
       - name: Decode keystore from secret
         if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/chromasound.keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ${{ github.workspace }}/chromasound-upload.jks
 
-      - name: Build Release APK (signed)
+      - name: Build Release AAB (signed)
         if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
-        run: |
-          gradle assembleRelease --no-daemon --stacktrace \
-            -Pandroid.injected.signing.store.file=${{ github.workspace }}/app/chromasound.keystore \
-            -Pandroid.injected.signing.store.password=${{ secrets.KEY_STORE_PASSWORD }} \
-            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
-            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+        run: gradle bundleRelease --no-daemon --stacktrace
         env:
           ANDROID_HOME: /opt/android-sdk
           ANDROID_SDK_ROOT: /opt/android-sdk
+          KEYSTORE_PATH: ${{ github.workspace }}/chromasound-upload.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      - name: Upload Release APK artifact
+      - name: Upload Release AAB artifact
         if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: ChromaSound-release-${{ github.sha }}
-          path: app/build/outputs/apk/release/app-release.apk
+          name: ChromaSound-release-aab-${{ github.sha }}
+          path: app/build/outputs/bundle/release/app-release.aab
           retention-days: 90
 
-      # ── 8. Attach signed APK to the GitHub Release page ───────────────────
-      - name: Attach APK to GitHub Release
+      # ── 8. Attach signed AAB to the GitHub Release page ───────────────────
+      - name: Attach AAB to GitHub Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/release/app-release.apk
+          files: app/build/outputs/bundle/release/app-release.aab
           token: ${{ secrets.GITHUB_TOKEN }}
