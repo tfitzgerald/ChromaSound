@@ -203,6 +203,8 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
                 .coerceAtLeast(new.minRadiusPx + 10f),
             placement       = new.placement.coerceIn(Settings.MIN_PLACEMENT, Settings.MAX_PLACEMENT),
             sensitivity     = new.sensitivity.coerceIn(Settings.MIN_SENSITIVITY, Settings.MAX_SENSITIVITY),
+            colorScheme     = new.colorScheme,
+            objectShape     = new.objectShape,
             subBands        = new.subBands.coerceIn(Settings.MIN_SUB_BANDS, Settings.MAX_SUB_BANDS),
             noiseGateDb     = new.noiseGateDb.coerceIn(Settings.MIN_NOISE_GATE_DB, Settings.MAX_NOISE_GATE_DB),
             mirrorMode      = new.mirrorMode,

@@ -49,27 +49,27 @@ fun SettingsScreen(
     onOpenPresets:    () -> Unit = {}
 ) {
     // All local state in one place — shared across sub-screens
-    var bandCount       by remember(currentSettings) { mutableStateOf(currentSettings.bandCount.toFloat()) }
-    var lifetimeMs      by remember(currentSettings) { mutableStateOf(currentSettings.lifetimeMs.toFloat()) }
-    var circlesPerBand  by remember(currentSettings) { mutableStateOf(currentSettings.circlesPerBand.toFloat()) }
-    var minRadius       by remember(currentSettings) { mutableStateOf(currentSettings.minRadiusPx) }
-    var maxRadius       by remember(currentSettings) { mutableStateOf(currentSettings.maxRadiusPx) }
-    var placement       by remember(currentSettings) { mutableStateOf(currentSettings.placement) }
-    var sensitivity     by remember(currentSettings) { mutableStateOf(currentSettings.sensitivity) }
-    var colorScheme     by remember(currentSettings) { mutableStateOf(currentSettings.colorScheme) }
-    var objectShape     by remember(currentSettings) { mutableStateOf(currentSettings.objectShape) }
-    var subBands        by remember(currentSettings) { mutableStateOf(currentSettings.subBands.toFloat()) }
-    var noiseGateDb     by remember(currentSettings) { mutableStateOf(currentSettings.noiseGateDb) }
-    var mirrorMode      by remember(currentSettings) { mutableStateOf(currentSettings.mirrorMode) }
-    var trailLength     by remember(currentSettings) { mutableStateOf(currentSettings.trailLength.toFloat()) }
-    var beatSensitivity by remember(currentSettings) { mutableStateOf(currentSettings.beatSensitivity) }
-    var colorAnimSpeed  by remember(currentSettings) { mutableStateOf(currentSettings.colorAnimSpeed) }
-    var showWaveform      by remember(currentSettings) { mutableStateOf(currentSettings.showWaveform) }
-    var particlesEnabled  by remember(currentSettings) { mutableStateOf(currentSettings.particlesEnabled) }
-    var particleThreshold by remember(currentSettings) { mutableStateOf(currentSettings.particleThreshold) }
-    var oscilloscopeMode  by remember(currentSettings) { mutableStateOf(currentSettings.oscilloscopeMode) }
-    var backgroundEffect  by remember(currentSettings) { mutableStateOf(currentSettings.backgroundEffect) }
-    var themeMode         by remember(currentSettings) { mutableStateOf(currentSettings.themeMode) }
+    var bandCount       by remember { mutableStateOf(currentSettings.bandCount.toFloat()) }
+    var lifetimeMs      by remember { mutableStateOf(currentSettings.lifetimeMs.toFloat()) }
+    var circlesPerBand  by remember { mutableStateOf(currentSettings.circlesPerBand.toFloat()) }
+    var minRadius       by remember { mutableStateOf(currentSettings.minRadiusPx) }
+    var maxRadius       by remember { mutableStateOf(currentSettings.maxRadiusPx) }
+    var placement       by remember { mutableStateOf(currentSettings.placement) }
+    var sensitivity     by remember { mutableStateOf(currentSettings.sensitivity) }
+    var colorScheme     by remember { mutableStateOf(currentSettings.colorScheme) }
+    var objectShape     by remember { mutableStateOf(currentSettings.objectShape) }
+    var subBands        by remember { mutableStateOf(currentSettings.subBands.toFloat()) }
+    var noiseGateDb     by remember { mutableStateOf(currentSettings.noiseGateDb) }
+    var mirrorMode      by remember { mutableStateOf(currentSettings.mirrorMode) }
+    var trailLength     by remember { mutableStateOf(currentSettings.trailLength.toFloat()) }
+    var beatSensitivity by remember { mutableStateOf(currentSettings.beatSensitivity) }
+    var colorAnimSpeed  by remember { mutableStateOf(currentSettings.colorAnimSpeed) }
+    var showWaveform      by remember { mutableStateOf(currentSettings.showWaveform) }
+    var particlesEnabled  by remember { mutableStateOf(currentSettings.particlesEnabled) }
+    var particleThreshold by remember { mutableStateOf(currentSettings.particleThreshold) }
+    var oscilloscopeMode  by remember { mutableStateOf(currentSettings.oscilloscopeMode) }
+    var backgroundEffect  by remember { mutableStateOf(currentSettings.backgroundEffect) }
+    var themeMode         by remember { mutableStateOf(currentSettings.themeMode) }
 
     var openSection by remember { mutableStateOf(Section.NONE) }
 
@@ -324,7 +324,7 @@ private fun SettingsHubScreen(
 
         // ── Version footer ────────────────────────────────────────────────────────
         item {
-            Text("ChromaSound  ·  Version 2.3.2",
+            Text("ChromaSound  ·  Version 2.3.3",
                 color = UiSubtle.copy(alpha = 0.6f), fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
