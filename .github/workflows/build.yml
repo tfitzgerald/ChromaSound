@@ -86,7 +86,7 @@ jobs:
       # Only runs on release events or manual workflow_dispatch triggers.
       - name: Decode keystore from secret
         if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ${{ github.workspace }}/chromasound-upload.jks
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > /tmp/chromasound-upload.jks
 
       - name: Build Release AAB (signed)
         if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
@@ -94,7 +94,7 @@ jobs:
         env:
           ANDROID_HOME: /opt/android-sdk
           ANDROID_SDK_ROOT: /opt/android-sdk
-          KEYSTORE_PATH: ${{ github.workspace }}/chromasound-upload.jks
+          KEYSTORE_PATH: /tmp/chromasound-upload.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
