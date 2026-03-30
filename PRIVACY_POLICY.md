@@ -49,7 +49,7 @@ If this privacy policy is updated, the revised version will be posted here with 
 If you have questions about this privacy policy, please contact:
 
 **Thane Fitzgerald**
-Email: [your-email@example.com]
+Email: tfitzgerald@rogers.com
 
 ## Open Source
 
