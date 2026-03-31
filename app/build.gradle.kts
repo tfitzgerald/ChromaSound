@@ -4,7 +4,7 @@ plugins {
 }
 android {
     namespace = "com.chromasound.app"
-    compileSdk = 34
+    compileSdk = 35
 
     signingConfigs {
         create("release") {
@@ -21,7 +21,7 @@ android {
     defaultConfig {
         applicationId = "com.chromasound.app"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "2.3.3"
     }
