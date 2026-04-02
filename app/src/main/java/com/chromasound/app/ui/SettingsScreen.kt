@@ -72,6 +72,8 @@ fun SettingsScreen(
     var oscilloscopeMode  by remember { mutableStateOf(currentSettings.oscilloscopeMode) }
     var backgroundEffect  by remember { mutableStateOf(currentSettings.backgroundEffect) }
     var themeMode         by remember { mutableStateOf(currentSettings.themeMode) }
+    var autoGain          by remember { mutableStateOf(currentSettings.autoGain) }
+    var shapeOpacity      by remember { mutableStateOf(currentSettings.shapeOpacity) }
 
     var openSection by remember { mutableStateOf(Section.NONE) }
 
@@ -96,7 +98,9 @@ fun SettingsScreen(
         particleThreshold = particleThreshold,
         oscilloscopeMode  = oscilloscopeMode,
         backgroundEffect  = backgroundEffect,
-        themeMode         = themeMode
+        themeMode         = themeMode,
+        autoGain          = autoGain,
+        shapeOpacity      = shapeOpacity
     ))
 
     val sliderColors = SliderDefaults.colors(
@@ -131,9 +135,11 @@ fun SettingsScreen(
         Section.AUDIO -> AudioScreen(
             sensitivity  = sensitivity,
             noiseGateDb  = noiseGateDb,
+            autoGain     = autoGain,
             sliderColors = sliderColors,
             onSensitivity = { sensitivity = it; emit() },
             onNoiseGate   = { noiseGateDb = it; emit() },
+            onAutoGain    = { autoGain = it; emit() },
             onBack        = { openSection = Section.NONE }
         )
         Section.VISUAL -> VisualScreen(

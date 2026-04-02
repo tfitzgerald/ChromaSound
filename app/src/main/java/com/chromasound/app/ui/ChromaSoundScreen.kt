@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
@@ -722,18 +723,21 @@ private fun VisualizerCanvas(
             else "${"%.0f".format(loudestShape.centreHz)} Hz"
             val life = loudestShape.lifeFraction(nowMs)
             val labelAlpha = (life * 200).toInt().coerceIn(60, 200)
-            drawContext.canvas.nativeCanvas.apply {
+            // Draw peak label using drawIntoCanvas to access native canvas
+            drawIntoCanvas { composeCanvas ->
                 val paint = android.graphics.Paint().apply {
-                    color = android.graphics.Color.argb(labelAlpha,
+                    color = android.graphics.Color.argb(
+                        labelAlpha,
                         (loudestShape.color.red * 255).toInt(),
                         (loudestShape.color.green * 255).toInt(),
-                        (loudestShape.color.blue * 255).toInt())
+                        (loudestShape.color.blue * 255).toInt()
+                    )
                     textSize    = 28f
                     textAlign   = android.graphics.Paint.Align.CENTER
                     typeface    = android.graphics.Typeface.MONOSPACE
                     isAntiAlias = true
                 }
-                drawText(labelHz, lx, ly, paint)
+                composeCanvas.nativeCanvas.drawText(labelHz, lx, ly, paint)
             }
         }
 
