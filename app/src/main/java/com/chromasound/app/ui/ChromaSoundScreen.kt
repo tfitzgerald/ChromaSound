@@ -20,8 +20,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
@@ -35,6 +35,7 @@ import com.chromasound.app.model.BackgroundEffect
 import com.chromasound.app.model.MirrorMode
 import com.chromasound.app.model.ObjectShape
 import com.chromasound.app.model.Settings
+import com.chromasound.app.fft.FrequencyColorMapper
 import kotlin.math.*
 
 private val BgColor  = Color(0xFF050508)
@@ -449,6 +450,25 @@ private fun VisualizerCanvas(
     // Track last RMS per band for transient detection
     val prevBandRms = remember { FloatArray(32) }
 
+    // ── Starfield state ───────────────────────────────────────────────────
+    data class Star(var x: Float, var y: Float, val speed: Float, val size: Float)
+    val stars = remember {
+        List(120) { Star(
+            x     = kotlin.random.Random.nextFloat(),
+            y     = kotlin.random.Random.nextFloat(),
+            speed = 0.0003f + kotlin.random.Random.nextFloat() * 0.0008f,
+            size  = 3f + kotlin.random.Random.nextFloat() * 5f   // 3–8px, clearly visible
+        ) }
+    }
+
+    // Trail history: a ring buffer of recent circle snapshots.
+    // Each entry is a full List<FrequencyCircle> captured at that frame.
+    // Index 0 = most recent past frame, MAX_TRAIL_LENGTH-1 = oldest.
+    val trailHistory = remember {
+        ArrayDeque<List<FrequencyCircle>>(Settings.MAX_TRAIL_LENGTH)
+    }
+    var prevCircles by remember { mutableStateOf<List<FrequencyCircle>>(emptyList()) }
+
     // ── Terrain ring buffer — last 30 rows of per-band dB levels ─────────
     val TERRAIN_ROWS   = 30
     val terrainHistory = remember { ArrayDeque<FloatArray>() }
@@ -471,25 +491,6 @@ private fun VisualizerCanvas(
             }
         }
     }
-
-    // ── Starfield state ───────────────────────────────────────────────────
-    data class Star(var x: Float, var y: Float, val speed: Float, val size: Float)
-    val stars = remember {
-        List(120) { Star(
-            x     = kotlin.random.Random.nextFloat(),
-            y     = kotlin.random.Random.nextFloat(),
-            speed = 0.0003f + kotlin.random.Random.nextFloat() * 0.0008f,
-            size  = 3f + kotlin.random.Random.nextFloat() * 5f   // 3–8px, clearly visible
-        ) }
-    }
-
-    // Trail history: a ring buffer of recent circle snapshots.
-    // Each entry is a full List<FrequencyCircle> captured at that frame.
-    // Index 0 = most recent past frame, MAX_TRAIL_LENGTH-1 = oldest.
-    val trailHistory = remember {
-        ArrayDeque<List<FrequencyCircle>>(Settings.MAX_TRAIL_LENGTH)
-    }
-    var prevCircles by remember { mutableStateOf<List<FrequencyCircle>>(emptyList()) }
 
     // Beat pulse animation — animates from 1.4 back to 1.0 over 250ms on each beat
     var pulseScale by remember { mutableStateOf(1f) }
@@ -571,10 +572,7 @@ private fun VisualizerCanvas(
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                 renderJulia(juliaPixels, JULIA_W, JULIA_H, cx, cy)
             }
-            juliaBitmap = ImageBitmap(JULIA_W, JULIA_H).also { bmp ->
-                val pixMap = bmp.prepareToDraw()
-            }
-            // Use android.graphics.Bitmap for pixel manipulation
+            // Convert pixel array to android.graphics.Bitmap then to Compose ImageBitmap
             val androidBmp = android.graphics.Bitmap.createBitmap(
                 juliaPixels, JULIA_W, JULIA_H, android.graphics.Bitmap.Config.ARGB_8888)
             juliaBitmap = androidBmp.asImageBitmap()
@@ -724,19 +722,18 @@ private fun VisualizerCanvas(
             else "${"%.0f".format(loudestShape.centreHz)} Hz"
             val life = loudestShape.lifeFraction(nowMs)
             val labelAlpha = (life * 200).toInt().coerceIn(60, 200)
-            drawIntoCanvas { canvas ->
+            drawContext.canvas.nativeCanvas.apply {
                 val paint = android.graphics.Paint().apply {
-                    color = loudestShape.color.copy(alpha = 0f).toArgb()
-                        .let { android.graphics.Color.argb(labelAlpha,
-                            android.graphics.Color.red(loudestShape.color.toArgb()),
-                            android.graphics.Color.green(loudestShape.color.toArgb()),
-                            android.graphics.Color.blue(loudestShape.color.toArgb())) }
-                    textSize  = 28f
-                    textAlign = android.graphics.Paint.Align.CENTER
-                    typeface  = android.graphics.Typeface.MONOSPACE
+                    color = android.graphics.Color.argb(labelAlpha,
+                        (loudestShape.color.red * 255).toInt(),
+                        (loudestShape.color.green * 255).toInt(),
+                        (loudestShape.color.blue * 255).toInt())
+                    textSize    = 28f
+                    textAlign   = android.graphics.Paint.Align.CENTER
+                    typeface    = android.graphics.Typeface.MONOSPACE
                     isAntiAlias = true
                 }
-                canvas.nativeCanvas.drawText(labelHz, lx, ly, paint)
+                drawText(labelHz, lx, ly, paint)
             }
         }
 
@@ -748,7 +745,7 @@ private fun VisualizerCanvas(
                 if (life <= 0f) return@forEach
 
                 val alpha   = (if (life > 0.4f) 1f else life / 0.4f) * shapeOpacity
-                val col     = shiftedColor(circle)
+                val col = circle.color
 
                 // Ribbon geometry
                 val bandCx  = circle.x * w + ribbonDriftX[b]   // column centre + drift
@@ -1064,7 +1061,7 @@ private fun VisualizerCanvas(
                     blendMode = BlendMode.Screen
                 )
             } else {
-                drawShape(shifted, life, shape, angleRad)
+                drawShape(shifted, life, shape, angleRad, shapeOpacity)
             }
         }
 
@@ -1220,10 +1217,11 @@ private fun subBandGradient(
 
 // ── Shape dispatcher ──────────────────────────────────────────────────────────
 private fun DrawScope.drawShape(
-    circle:   FrequencyCircle,
-    life:     Float,
-    shape:    ObjectShape,
-    angleRad: Float
+    circle:      FrequencyCircle,
+    life:        Float,
+    shape:       ObjectShape,
+    angleRad:    Float,
+    shapeOpacity: Float = 1f
 ) {
     val cx    = circle.x * size.width
     val cy    = circle.y * size.height

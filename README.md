@@ -1,5 +1,5 @@
 # ChromaSound
-![ChromaSound visualiser](docs/screenshot.png)
+
 **Real-Time Audio Frequency Visualiser for Android**
 
 > Version 2.8.0 · Build 17 · ThinkingThane / FunAndGames · Pickering, Ontario, Canada

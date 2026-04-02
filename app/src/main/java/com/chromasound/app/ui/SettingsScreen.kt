@@ -1,6 +1,8 @@
 package com.chromasound.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -135,17 +137,19 @@ fun SettingsScreen(
             onBack        = { openSection = Section.NONE }
         )
         Section.VISUAL -> VisualScreen(
-            subBands      = subBands,
-            colorScheme   = colorScheme,
-            objectShape   = objectShape,
-            themeMode     = themeMode,
-            sliderColors  = sliderColors,
-            onSubBands    = { subBands = it; emit() },
-            onColorScheme = { colorScheme = it; emit() },
-            onObjectShape = { objectShape = it; emit() },
-            onThemeMode   = { themeMode = it; emit() },
-            onBandColors  = onOpenBandColors,
-            onBack        = { openSection = Section.NONE }
+            subBands       = subBands,
+            colorScheme    = colorScheme,
+            objectShape    = objectShape,
+            themeMode      = themeMode,
+            shapeOpacity   = shapeOpacity,
+            sliderColors   = sliderColors,
+            onSubBands     = { subBands = it; emit() },
+            onColorScheme  = { colorScheme = it; emit() },
+            onObjectShape  = { objectShape = it; emit() },
+            onThemeMode    = { themeMode = it; emit() },
+            onShapeOpacity = { shapeOpacity = it; emit() },
+            onBandColors   = onOpenBandColors,
+            onBack         = { openSection = Section.NONE }
         )
         Section.EFFECTS -> EffectsScreen(
             mirrorMode        = mirrorMode,
