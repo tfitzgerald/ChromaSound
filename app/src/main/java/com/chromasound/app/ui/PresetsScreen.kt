@@ -70,7 +70,9 @@ data class NamedPreset(
     val particleThreshold:Float           = 0.6f,
     val oscilloscopeMode: Boolean         = false,
     val backgroundEffect: BackgroundEffect = BackgroundEffect.NONE,
-    val themeMode:        ThemeMode        = ThemeMode.DARK
+    val themeMode:        ThemeMode        = ThemeMode.DARK,
+    val autoGain:         Boolean          = true,
+    val shapeOpacity:     Float            = 1.0f
 ) {
     fun toSettings(base: Settings) = base.copy(
         bandCount       = bandCount,
@@ -94,6 +96,8 @@ data class NamedPreset(
         oscilloscopeMode  = oscilloscopeMode,
         backgroundEffect  = backgroundEffect,
         themeMode         = themeMode,
+        autoGain          = autoGain,
+        shapeOpacity      = shapeOpacity,
         bandColors        = emptyMap()
     )
 }
@@ -120,7 +124,9 @@ fun Settings.toPreset(name: String) = NamedPreset(
     particleThreshold = particleThreshold,
     oscilloscopeMode  = oscilloscopeMode,
     backgroundEffect  = backgroundEffect,
-    themeMode         = themeMode
+    themeMode         = themeMode,
+    autoGain          = autoGain,
+    shapeOpacity      = shapeOpacity
 )
 
 // ── Preset persistence ────────────────────────────────────────────────────────
@@ -165,7 +171,9 @@ fun loadPresets(context: Context): List<NamedPreset> {
                     catch (_: Exception) { BackgroundEffect.NONE },
                 themeMode         = try { ThemeMode.valueOf(
                     prefs.getString("${i}_themeMode", ThemeMode.DARK.name)!!) }
-                    catch (_: Exception) { ThemeMode.DARK }
+                    catch (_: Exception) { ThemeMode.DARK },
+                autoGain          = prefs.getBoolean("${i}_autoGain", true),
+                shapeOpacity      = prefs.getFloat("${i}_shapeOpacity", 1.0f)
             )
         } catch (_: Exception) { null }
     }
@@ -199,6 +207,8 @@ fun savePresets(context: Context, presets: List<NamedPreset>) {
             putBoolean("${i}_oscilloscopeMode",   p.oscilloscopeMode)
             putString("${i}_backgroundEffect",    p.backgroundEffect.name)
             putString("${i}_themeMode",           p.themeMode.name)
+            putBoolean("${i}_autoGain",           p.autoGain)
+            putFloat("${i}_shapeOpacity",          p.shapeOpacity)
         }
         apply()
     }
@@ -762,6 +772,10 @@ private fun PasteCodeDialog(onApply: (String) -> Unit, onDismiss: () -> Unit) {
 private fun shapeEmoji(shape: ObjectShape) = when (shape) {
     ObjectShape.CIRCLE -> "●"; ObjectShape.STAR -> "★"; ObjectShape.BOX_2D -> "■"
     ObjectShape.BOX_3D -> "⬡"; ObjectShape.SPHERE -> "◉"
+    ObjectShape.FRACTAL_KOCH -> "❄"; ObjectShape.FRACTAL_SIERPINSKI -> "△"
+    ObjectShape.FRACTAL_DRAGON -> "∾"
+    ObjectShape.VECTOR         -> "→"
+    ObjectShape.RIBBON         -> "∿"
 }
 
 private fun presetSummary(p: NamedPreset): String {

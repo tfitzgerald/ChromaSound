@@ -12,20 +12,18 @@ enum class ColorScheme {
 // ── Object shape enum ─────────────────────────────────────────────────────────
 
 enum class ObjectShape {
-    CIRCLE,
-    STAR,
-    BOX_2D,
-    BOX_3D,
-    SPHERE
+    CIRCLE, STAR, BOX_2D, BOX_3D, SPHERE,
+    FRACTAL_KOCH,
+    FRACTAL_SIERPINSKI,
+    FRACTAL_DRAGON,
+    VECTOR,         // spinning frequency vector — length=dB, colour=freq, 15s lifetime
+    RIBBON          // flowing silk ribbon wave — amplitude=dB, ripple=freq band
 }
 
 // ── Mirror mode enum ──────────────────────────────────────────────────────────
 
 enum class MirrorMode {
-    OFF,        // normal — no mirroring
-    HORIZONTAL, // left ↔ right
-    VERTICAL,   // top ↔ bottom
-    QUAD        // all four quadrants
+    OFF, HORIZONTAL, VERTICAL, QUAD
 }
 
 // ── Background effect enum ────────────────────────────────────────────────────
@@ -34,7 +32,9 @@ enum class BackgroundEffect {
     NONE,
     STARFIELD,
     BLOOM,
-    NOISE
+    NOISE,
+    JULIA,       // Julia set fractal — seed driven by dominant frequency + RMS
+    TERRAIN      // 3D perspective frequency terrain — scrolls toward viewer
 }
 
 // ── Theme mode enum ───────────────────────────────────────────────────────────
@@ -70,7 +70,11 @@ data class Settings(
     val particleThreshold:  Float       = 0.6f,
     val oscilloscopeMode:   Boolean     = false,
     val backgroundEffect:   BackgroundEffect = BackgroundEffect.NONE,
-    val themeMode:          ThemeMode   = ThemeMode.DARK
+    val themeMode:          ThemeMode   = ThemeMode.DARK,
+    // Auto-Gain Control — normalises quiet/loud input automatically
+    val autoGain:           Boolean     = true,
+    // Shape opacity multiplier — 0.3 (ghostly) to 1.0 (full)
+    val shapeOpacity:       Float       = 1.0f
 ) {
     companion object {
         const val MIN_LIFETIME_MS           = 100L
@@ -99,6 +103,8 @@ data class Settings(
         const val MAX_COLOR_ANIM_SPEED      = 3f
         const val MIN_PARTICLE_THRESHOLD    = 0.1f
         const val MAX_PARTICLE_THRESHOLD    = 1.0f
+        const val MIN_SHAPE_OPACITY         = 0.2f
+        const val MAX_SHAPE_OPACITY         = 1.0f
     }
 }
 

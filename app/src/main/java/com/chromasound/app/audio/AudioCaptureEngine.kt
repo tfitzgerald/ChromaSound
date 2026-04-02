@@ -36,11 +36,12 @@ class AudioCaptureEngine {
      * @param beatSensitivity How much louder than recent average RMS counts as a beat — read each frame.
      */
     fun audioFrameFlow(
-        bands:            () -> BandDefinition,
-        sensitivity:      () -> Float,
-        subBands:         () -> Int,
-        noiseGate:        () -> Float,
-        beatSensitivity:  () -> Float
+        bands:           () -> BandDefinition,
+        sensitivity:     () -> Float,
+        subBands:        () -> Int,
+        noiseGate:       () -> Float,
+        beatSensitivity: () -> Float,
+        autoGain:        () -> Boolean
     ): Flow<AudioFrame> = flow {
 
         val minBuf     = AudioRecord.getMinBufferSize(
@@ -57,15 +58,16 @@ class AudioCaptureEngine {
             "AudioRecord failed to initialise — check RECORD_AUDIO permission"
         }
 
-        val pcm      = FloatArray(FFT_SIZE)
-        val windowed = FloatArray(FFT_SIZE)
+        val pcm = FloatArray(FFT_SIZE); val windowed = FloatArray(FFT_SIZE)
+        val rmsHistory  = ArrayDeque<Float>(43)
+        val beatTimesMs = ArrayDeque<Long>(8)
+        var lastBeatMs  = 0L
+        val minBeatGapMs = 250L
 
-        // ── Beat detection state ──────────────────────────────────────────────
-        // Rolling window of recent RMS values — 43 frames ≈ 4 seconds at 93ms/frame
-        val rmsHistory   = ArrayDeque<Float>(43)
-        val beatTimesMs  = ArrayDeque<Long>(8)   // timestamps of last 8 beats for BPM
-        var lastBeatMs   = 0L
-        val minBeatGapMs = 250L                  // max ~240 BPM — ignore faster
+        // AGC state — tracks slow-moving peak to normalise gain automatically
+        var agcPeak = 0.02f        // initial assumption: moderate input level
+        val agcAttack  = 0.15f     // how fast gain drops on loud input
+        val agcRelease = 0.003f    // how slowly gain recovers on quiet input
 
         try {
             recorder.startRecording()
@@ -94,11 +96,24 @@ class AudioCaptureEngine {
                     else max(20f * log10(mag.toDouble()).toFloat(), DB_FLOOR)
                 }
 
-                // Apply sensitivity gain
-                val gain     = sensitivity().coerceIn(0.1f, 3.0f)
-                val dBLevels = FloatArray(rawDb.size) { i ->
-                    (rawDb[i] * gain).coerceIn(DB_FLOOR, 0f)
+                // Apply sensitivity gain — with optional Auto-Gain Control
+                val gain = if (autoGain()) {
+                    // AGC: track slow-moving peak RMS and normalise against it
+                    // Attack is fast (loud input quickly reduces gain ceiling)
+                    // Release is slow (quiet input gradually recovers gain)
+                    if (rms > agcPeak) {
+                        agcPeak = agcPeak + (rms - agcPeak) * agcAttack
+                    } else {
+                        agcPeak = (agcPeak - agcRelease).coerceAtLeast(0.005f)
+                    }
+                    // Target: agcPeak maps to ~0.6 so there's headroom for peaks
+                    val agcGain = (0.6f / agcPeak.coerceAtLeast(0.005f))
+                        .coerceIn(0.5f, 8.0f)  // never go below 0.5x or above 8x
+                    agcGain * sensitivity().coerceIn(0.1f, 3.0f)
+                } else {
+                    sensitivity().coerceIn(0.1f, 3.0f)
                 }
+                val dBLevels = FloatArray(rawDb.size) { i -> (rawDb[i] * gain).coerceIn(DB_FLOOR, 0f) }
 
                 // Per-band peak bin — use the user-adjustable noise gate threshold
                 val bd  = bands()

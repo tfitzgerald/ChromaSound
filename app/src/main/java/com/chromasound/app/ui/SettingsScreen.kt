@@ -324,7 +324,7 @@ private fun SettingsHubScreen(
 
         // ── Version footer ────────────────────────────────────────────────────────
         item {
-            Text("ChromaSound  ·  Version 2.3.3",
+            Text("ChromaSound  ·  Version 2.8.0",
                 color = UiSubtle.copy(alpha = 0.6f), fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
@@ -501,19 +501,30 @@ private fun AudioScreen(
 // ── VISUAL ────────────────────────────────────────────────────────────────────
 @Composable
 private fun VisualScreen(
-    subBands:      Float,
-    colorScheme:   ColorScheme,
-    objectShape:   ObjectShape,
-    themeMode:     ThemeMode,
-    sliderColors:  SliderColors,
-    onSubBands:    (Float) -> Unit,
-    onColorScheme: (ColorScheme) -> Unit,
-    onObjectShape: (ObjectShape) -> Unit,
-    onThemeMode:   (ThemeMode) -> Unit,
-    onBandColors:  () -> Unit,
-    onBack:        () -> Unit
+    subBands:       Float,
+    colorScheme:    ColorScheme,
+    objectShape:    ObjectShape,
+    themeMode:      ThemeMode,
+    shapeOpacity:   Float,
+    sliderColors:   SliderColors,
+    onSubBands:     (Float) -> Unit,
+    onColorScheme:  (ColorScheme) -> Unit,
+    onObjectShape:  (ObjectShape) -> Unit,
+    onThemeMode:    (ThemeMode) -> Unit,
+    onShapeOpacity: (Float) -> Unit,
+    onBandColors:   () -> Unit,
+    onBack:         () -> Unit
 ) {
     SubScreen("VISUAL", "🎨", Color(0xFFFFCC00), onBack) {
+        SettingCard("SHAPE OPACITY",
+            "Overall transparency of all shapes — lower = ghostly, atmospheric",
+            value = "${"%.0f".format(shapeOpacity * 100)}%", unit = "opacity") {
+            Slider(value = shapeOpacity, onValueChange = onShapeOpacity,
+                valueRange = Settings.MIN_SHAPE_OPACITY..Settings.MAX_SHAPE_OPACITY,
+                colors = sliderColors, modifier = Modifier.fillMaxWidth())
+            SliderLabels("20%  ghostly", "100%  solid")
+        }
+        Spacer(Modifier.height(14.dp))
         SettingCard("SUB-BAND SHADING",
             "Radial shading rings from centre to edge (1 = solid colour)",
             value = if (subBands.roundToInt() == 1) "Off" else "${subBands.roundToInt()}",
@@ -554,21 +565,32 @@ private fun VisualScreen(
                 fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
             Spacer(Modifier.height(12.dp))
             val shapes = ObjectShape.entries
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 shapes.forEach { shape ->
                     val selected = objectShape == shape
                     val emoji = when (shape) {
                         ObjectShape.CIRCLE -> "●"; ObjectShape.STAR -> "★"
                         ObjectShape.BOX_2D -> "■"; ObjectShape.BOX_3D -> "⬡"
                         ObjectShape.SPHERE -> "◉"
+                        ObjectShape.FRACTAL_KOCH -> "❄"
+                        ObjectShape.FRACTAL_SIERPINSKI -> "△"
+                        ObjectShape.FRACTAL_DRAGON -> "∾"
+                        ObjectShape.VECTOR         -> "→"
+                        ObjectShape.RIBBON         -> "∿"
                     }
                     val label = when (shape) {
                         ObjectShape.CIRCLE -> "Circle"; ObjectShape.STAR -> "Star"
                         ObjectShape.BOX_2D -> "Box"; ObjectShape.BOX_3D -> "3D"
                         ObjectShape.SPHERE -> "Sphere"
+                        ObjectShape.FRACTAL_KOCH -> "Koch"
+                        ObjectShape.FRACTAL_SIERPINSKI -> "Sierp"
+                        ObjectShape.FRACTAL_DRAGON -> "Dragon"
+                        ObjectShape.VECTOR -> "Vector"
+                        ObjectShape.RIBBON -> "Ribbon"
                     }
                     Column(
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.width(56.dp)
                             .clip(RoundedCornerShape(10.dp))
                             .background(if (selected) UiAccent.copy(alpha = 0.18f) else Color.Transparent)
                             .border(1.dp,
@@ -853,9 +875,12 @@ private fun EffectsScreen(
                 BackgroundEffect.NONE     to "None",
                 BackgroundEffect.STARFIELD to "Stars",
                 BackgroundEffect.BLOOM    to "Bloom",
-                BackgroundEffect.NOISE    to "Noise"
+                BackgroundEffect.NOISE    to "Noise",
+                BackgroundEffect.JULIA    to "Julia",
+                BackgroundEffect.TERRAIN  to "Terrain"
             )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 bgOptions.forEach { (effect, label) ->
                     val selected = backgroundEffect == effect
                     val emoji = when(effect) {
@@ -863,9 +888,11 @@ private fun EffectsScreen(
                         BackgroundEffect.STARFIELD -> "✦"
                         BackgroundEffect.BLOOM     -> "◉"
                         BackgroundEffect.NOISE     -> "▦"
+                        BackgroundEffect.JULIA     -> "∞"
+                        BackgroundEffect.TERRAIN   -> "⛰"
                     }
                     Column(
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.width(60.dp)
                             .clip(RoundedCornerShape(10.dp))
                             .background(if (selected) UiAccent.copy(alpha = 0.18f) else Color.Transparent)
                             .border(1.dp,

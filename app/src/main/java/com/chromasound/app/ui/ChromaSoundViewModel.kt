@@ -145,6 +145,8 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
             putBoolean("oscilloscopeMode",   s.oscilloscopeMode)
             putString("backgroundEffect",    s.backgroundEffect.name)
             putString("themeMode",           s.themeMode.name)
+            putBoolean("autoGain",            s.autoGain)
+            putFloat("shapeOpacity",          s.shapeOpacity)
             apply()
         }
     }
@@ -181,6 +183,8 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
                 backgroundEffect   = try {
                     BackgroundEffect.valueOf(prefs.getString("backgroundEffect", defaults.backgroundEffect.name) ?: defaults.backgroundEffect.name)
                 } catch (_: Exception) { defaults.backgroundEffect },
+                autoGain           = prefs.getBoolean("autoGain",  defaults.autoGain),
+                shapeOpacity       = prefs.getFloat("shapeOpacity", defaults.shapeOpacity),
                 themeMode          = try {
                     ThemeMode.valueOf(prefs.getString("themeMode", defaults.themeMode.name) ?: defaults.themeMode.name)
                 } catch (_: Exception) { defaults.themeMode },
@@ -217,6 +221,8 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
             oscilloscopeMode   = new.oscilloscopeMode,
             backgroundEffect   = new.backgroundEffect,
             themeMode          = new.themeMode,
+            autoGain           = new.autoGain,
+            shapeOpacity       = new.shapeOpacity.coerceIn(Settings.MIN_SHAPE_OPACITY, Settings.MAX_SHAPE_OPACITY),
             bandColors      = new.bandColors
         )
 
@@ -242,7 +248,8 @@ class ChromaSoundViewModel(application: Application) : AndroidViewModel(applicat
                 sensitivity      = { _settings.value.sensitivity },
                 subBands         = { _settings.value.subBands },
                 noiseGate        = { _settings.value.noiseGateDb },
-                beatSensitivity  = { _settings.value.beatSensitivity }
+                beatSensitivity  = { _settings.value.beatSensitivity },
+                autoGain         = { _settings.value.autoGain }
             )
                 .catch { _uiState.value = ChromaSoundUiState.Idle }
                 .collect { frame -> processFrame(frame) }
