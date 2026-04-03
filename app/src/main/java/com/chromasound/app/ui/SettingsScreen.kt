@@ -482,12 +482,42 @@ private fun SizePositionScreen(
 private fun AudioScreen(
     sensitivity:   Float,
     noiseGateDb:   Float,
+    autoGain:      Boolean,
     sliderColors:  SliderColors,
     onSensitivity: (Float) -> Unit,
     onNoiseGate:   (Float) -> Unit,
+    onAutoGain:    (Boolean) -> Unit,
     onBack:        () -> Unit
 ) {
     SubScreen("AUDIO", "🎙", Color(0xFFFF6B6B), onBack) {
+        // Auto-Gain Control toggle
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .background(BgCard, RoundedCornerShape(16.dp))
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("AUTO-GAIN CONTROL", color = UiSubtle, fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    if (autoGain) "Normalises quiet and loud input automatically"
+                    else "Manual sensitivity only",
+                    color = UiText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+            }
+            Switch(
+                checked = autoGain,
+                onCheckedChange = onAutoGain,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor   = UiText,
+                    checkedTrackColor   = UiAccent,
+                    uncheckedThumbColor = UiSubtle,
+                    uncheckedTrackColor = UiSubtle.copy(alpha = 0.3f)
+                )
+            )
+        }
+        Spacer(Modifier.height(14.dp))
         SettingCard("MIC SENSITIVITY", "Amplify or reduce response to incoming audio",
             value = "×${"%.1f".format(sensitivity)}", unit = "") {
             Slider(value = sensitivity, onValueChange = onSensitivity,
