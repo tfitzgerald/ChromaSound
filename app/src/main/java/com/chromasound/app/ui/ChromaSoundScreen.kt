@@ -722,22 +722,25 @@ private fun VisualizerCanvas(
                 "${"%.1f".format(loudestShape.centreHz / 1000f)} kHz"
             else "${"%.0f".format(loudestShape.centreHz)} Hz"
             val life = loudestShape.lifeFraction(nowMs)
-            val labelAlpha = (life * 200).toInt().coerceIn(60, 200)
-            // Draw peak label using drawIntoCanvas to access native canvas
-            drawIntoCanvas { composeCanvas ->
-                val paint = android.graphics.Paint().apply {
-                    color = android.graphics.Color.argb(
-                        labelAlpha,
-                        (loudestShape.color.red * 255).toInt(),
-                        (loudestShape.color.green * 255).toInt(),
-                        (loudestShape.color.blue * 255).toInt()
-                    )
+            val labelAlpha = life.coerceIn(0f, 1f)
+            // Draw using Compose Paint — no native canvas needed
+            drawIntoCanvas { canvas ->
+                val paint = androidx.compose.ui.graphics.Paint().apply {
+                    color = loudestShape.color.copy(alpha = labelAlpha * 0.9f)
+                }
+                val frameworkPaint = paint.asFrameworkPaint().apply {
                     textSize    = 28f
                     textAlign   = android.graphics.Paint.Align.CENTER
                     typeface    = android.graphics.Typeface.MONOSPACE
                     isAntiAlias = true
+                    color = android.graphics.Color.argb(
+                        (labelAlpha * 220).toInt().coerceIn(0, 255),
+                        (loudestShape.color.red * 255).toInt(),
+                        (loudestShape.color.green * 255).toInt(),
+                        (loudestShape.color.blue * 255).toInt()
+                    )
                 }
-                composeCanvas.nativeCanvas.drawText(labelHz, lx, ly, paint)
+                canvas.nativeCanvas.drawText(labelHz, lx, ly, frameworkPaint)
             }
         }
 
