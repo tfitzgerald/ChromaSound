@@ -22,8 +22,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -713,36 +711,7 @@ private fun VisualizerCanvas(
             )
         }
 
-        // ── 4b. Peak frequency label — floats above loudest shape ─────────────
-        val loudestShape = circles.maxByOrNull { it.decibelLevel }
-        if (loudestShape != null) {
-            val lx = loudestShape.x * w
-            val ly = (loudestShape.y * h - loudestShape.radiusPx - 14f).coerceAtLeast(24f)
-            val labelHz = if (loudestShape.centreHz >= 1000f)
-                "${"%.1f".format(loudestShape.centreHz / 1000f)} kHz"
-            else "${"%.0f".format(loudestShape.centreHz)} Hz"
-            val life = loudestShape.lifeFraction(nowMs)
-            val labelAlpha = life.coerceIn(0f, 1f)
-            // Draw using Compose Paint — no native canvas needed
-            drawIntoCanvas { canvas ->
-                val paint = androidx.compose.ui.graphics.Paint().apply {
-                    color = loudestShape.color.copy(alpha = labelAlpha * 0.9f)
-                }
-                val frameworkPaint = paint.asFrameworkPaint().apply {
-                    textSize    = 28f
-                    textAlign   = android.graphics.Paint.Align.CENTER
-                    typeface    = android.graphics.Typeface.MONOSPACE
-                    isAntiAlias = true
-                    color = android.graphics.Color.argb(
-                        (labelAlpha * 220).toInt().coerceIn(0, 255),
-                        (loudestShape.color.red * 255).toInt(),
-                        (loudestShape.color.green * 255).toInt(),
-                        (loudestShape.color.blue * 255).toInt()
-                    )
-                }
-                canvas.nativeCanvas.drawText(labelHz, lx, ly, frameworkPaint)
-            }
-        }
+        // ── 4b. Peak frequency label — drawn as Compose Text overlay (see RunningScreen)
 
         // ── 4b2. Ribbon shapes — flowing silk wave per frequency band ─────────
         if (shape == ObjectShape.RIBBON) {
